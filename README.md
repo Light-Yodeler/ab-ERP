@@ -1,98 +1,73 @@
-# Anda ERP - Desktop ERP & Sistem Pelaporan Pajak Daerah Ultra-Ringan
+# Anda ERP
 
-Sistem Desktop ERP Ultra-Ringan berbasis **Tauri v2 + Native Rust + SQLite C-Native (`rusqlite`)** yang direkayasa balik (*reverse engineering*) dari aplikasi pelaporan pajak lama berbasis Electron (~138 MB installer, ~200 MB RAM). Aplikasi ini dirancang modular untuk unit usaha **Anda Bungalows & Restaurant**, mencakup pelaporan pajak daerah (Dispenda/Bapenda Lombok Tengah), manajemen data transaksi mentah, pengarsipan otomatis berkas Excel, autentikasi PIN kriptografis, pencadangan database, dan modul rekonsiliasi audit target (Subset-Sum Optimizer).
-
----
-
-## ⚡ Keunggulan & Benchmark
-
-| Metrik | Hasil Aktual (Anda ERP) | Aplikasi Lama (Electron) | Peningkatan |
-|---|---|---|---|
-| **Ukuran Installer (.dmg macOS)** | **~3.4 - 4.2 MB** | ~138 MB | **~35x Lebih Ringan** |
-| **Ukuran Bundle Aplikasi (.app)** | **~7.8 MB** | ~280 MB | **~36x Lebih Kompak** |
-| **Konsumsi RAM (Idle / Aktif)** | **~25 - 35 MB** | 180 - 320 MB | **~8x Lebih Hemat RAM** |
-| **Waktu Peluncuran (Cold Startup)**| **Instan (< 0.2 detik)** | 2.5 - 4.5 detik | **> 15x Lebih Cepat** |
-| **Engine Database Lokal** | **SQLite C-Native (WAL Mode)** | In-Memory `sql.js` <!-- living-docs-ignore --> (raw RAM) | **Crash-Proof & ACID** |
-| **Kecepatan Solver Audit Target** | **< 1 ms (0.80 ms)** | N/A (Manual kalkulator) | **Sub-milidetik** |
-
----
-## 📚 Peta Dokumentasi
-
-Dokumentasi proyek dikelola secara terstruktur menggunakan panduan living-docs:
-* [README.md](README.md): Pengenalan sistem, benchmark performa, dan petunjuk lokal.
-* [CHANGELOG.md](CHANGELOG.md): Riwayat rilis dan perubahan fitur berbasis Semantic Versioning.
-* [docs/FEATURES.md](docs/FEATURES.md): Katalog lengkap fitur fungsional (`FEAT-01` s/d `FEAT-09`).
-* [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): Arsitektur teknis, kontrak IPC, skema database, ADR, dan runbook pemulihan bencana.
+Anda ERP (v1.6.5) adalah aplikasi desktop untuk pencatatan pendapatan harian, pelaporan pajak daerah, dan pendataan wisatawan pada unit usaha Anda Bungalows dan Anda Restaurant di Lombok Tengah. Aplikasi berjalan lokal tanpa server eksternal di atas Tauri v2, backend Rust, SQLite via `rusqlite` dalam mode WAL, serta antarmuka HTML5, CSS, dan JavaScript.
 
 ---
 
+## Fitur Utama
 
-## 🏗️ Arsitektur Proyek
-
-Aplikasi dibangun tanpa beban runtime Node.js/Chromium ganda menggunakan **Tauri v2**, backend **Rust murni**, dan antarmuka **HTML5 / CSS / Vanilla JS** berstandar Financial Desktop Utility (WCAG AA kontras tinggi):
-
-### 1. Backend Rust (`src-tauri/`)
-- `src/db.rs`: Manajemen koneksi SQLite C-native (`rusqlite`) dengan mode WAL, migrasi skema tabel (`units`, `transactions`, `import_logs`, `settings`, `users`), auto-migrasi data lama dari `laporan_bapenda.sqlite`, paginasi SQL efisien, serta backup/restore online crash-safe.
-- `src/auth.rs`: Hashing PIN berbasis PBKDF2 HMAC-SHA512 (10.000 iterasi) yang 100% kompatibel dengan hash database lama, verifikasi waktu-konstan, serta kontrol hak akses peran (`admin` dan `staff`).
-- `src/excel_importer.rs`: Mesin spreadsheet cepat berbasis `calamine`, deteksi unit bisnis otomatis (Bungalows vs Restaurant), normalisasi tanggal (serial date Excel 1900, ISO, Indonesia) dan nominal rupiah, mode ganti periode / skip duplicate, serta auto-archiving berkas fisik ke `arsip_excel/`.
-- `src/tax_report.rs`: Generator rekapitulasi kalender harian bulanan (hari 1 s/d 31), kalkulasi omset kotor, pajak daerah terutang 10%, pendapatan bersih, metrik hari aktif vs nihil, dan generator nomor dokumen resmi.
-- `src/optimizer.rs` & `src/excel.rs`: Mesin rekonsiliasi subset transaksi acak target baris 80 (Subset Sum solver) berbasis *Parallel Multi-Start Randomized Greedy + 2-Opt Local Search* dan injeksi formula `=SUM(...)` via `umya-spreadsheet`.
-- `src/commands.rs` & `src/lib.rs`: Registrasi seluruh Tauri IPC handler yang menghubungkan backend Rust ke frontend UI.
-
-### 2. Frontend UI (`src/`)
-- `index.html`: Layout aplikasi ERP desktop modern modular (Layar login PIN dengan keypad numerik, switcher unit bisnis global, 4 tab modul kerja, modal formulir A4 landscape resmi, dan modal pengaturan sistem).
-- `style.css`: Estetika **Financial Desktop Utility** dengan dukungan penuh Dark & Light theme (WCAG AA kontras tinggi, dial ENERGY 1 / RHYTHM 1 / MOTION 1, serta media query `@media print` A4 landscape presisi).
-- `app.js`: Logika interaktif modular, keyboard listener untuk PIN, rendering grafik bar SVG tren omset harian, dan paginasi data mentah.
+* Rekapitulasi pajak daerah bulanan menyusun kalender harian dari tanggal 1 hingga akhir bulan, menghitung pajak daerah sesuai tarif unit atau bawaan 10%, menampilkan grafik batang SVG, dan menyediakan cetak A4 landscape serta ekspor CSV.
+* Pendataan Wisatawan Form 1 Dinas Pariwisata membagi periode bulan ke empat minggu, memisahkan tamu domestik dan mancanegara, serta menghitung okupansi malam kamar (*room-night*) dan tempat tidur (*bed-night*).
+* Buku besar data mentah mendukung tampilan ringkas 3 kolom dan rincian reservasi 13 kolom dengan paginasi SQL, penyuntingan serta penghapusan reservasi khusus admin yang tersinkron ke transaksi dan Form 1, serta ekspor `.xlsx` 13 kolom.
+* Pengimpor spreadsheet berbasis `calamine` membaca berkas `.xlsx`, `.xls`, dan `.xlsm`, mendeteksi unit bisnis, memeriksa duplikat lewat hash SHA-256, menormalkan beragam format tanggal (`DD/MM/YY`, `DD/MM-YY`, `DD.MM.YYYY`, `YYYY-MM-DD`, ISO timestamp, serial Excel, dan teks bulan Indonesia atau Inggris) ke penyimpanan kanonik `YYYY-MM-DD`, membatasi mode timpa hanya bagi admin, dan mengarsipkan salinan berkas ke folder data lokal `arsip_excel/`.
+* Audit Target Solver menggunakan algoritma subset-sum paralel (Rayon) untuk berkas 2 kolom lama maupun 13 kolom reservasi, menjaga agar dua transaksi pada kamar dan malam yang sama tidak terpilih bersamaan tanpa mengubah nomor kamar asli, menampilkan peringatan konflik sumber serta anomali kamar atau tanggal dengan tampilan seragam `DD/MM/YY`, dan mengekspor `.xlsx` berumus dinamis `H`/`I`/`K` berformat `dd/mm/yy` beserta sheet `Referensi & Petunjuk`.
+* Autentikasi lokal memverifikasi PIN pengguna dengan PBKDF2-HMAC-SHA512 (10.000 iterasi) dan kontrol peran `admin` serta `staff`, dilengkapi backup online SQLite dan pemulihan database yang membuat cadangan `.pre_restore.bak` sebelum menimpa database aktif.
 
 ---
 
-## 🚀 Petunjuk Menjalankan & Membangun
+## Struktur Proyek
 
-### Prasyarat Mesin
-- **Rust Toolchain:** `rustc` & `cargo` $\ge 1.75$ (`rustup update stable`)
-- **Node.js:** $\ge 18$ (hanya untuk menjalankan script pembungkus Tauri CLI)
+| Berkas / Direktori | Peran dalam Sistem |
+|---|---|
+| [src-tauri/src/db.rs](src-tauri/src/db.rs) | Koneksi SQLite WAL (`rusqlite`), skema 6 tabel (`units`, `transactions`, `settings`, `import_logs`, `users`, `room_reservations`), paginasi SQL, CRUD tersinkronisasi, dan backup/restore. |
+| [src-tauri/src/auth.rs](src-tauri/src/auth.rs) | Hashing dan verifikasi PIN PBKDF2-HMAC-SHA512 waktu-konstan serta pengelolaan akun peran `admin` dan `staff`. |
+| [src-tauri/src/excel_importer.rs](src-tauri/src/excel_importer.rs) | Pratinjau impor, deteksi duplikat SHA-256, parser tanggal fleksibel multi-format, dan penulisan atomik ke SQLite. |
+| [src-tauri/src/tax_report.rs](src-tauri/src/tax_report.rs) | Kalkulasi rekap pajak bulanan dan statistik Form 1 Dinas Pariwisata untuk asal domestik maupun mancanegara. |
+| [src-tauri/src/optimizer.rs](src-tauri/src/optimizer.rs) | Solver subset-sum paralel (Rayon), deteksi konflik malam-kamar, dan pemeriksaan anomali kamar/tanggal. |
+| [src-tauri/src/excel.rs](src-tauri/src/excel.rs) | Analisis workbook 2 kolom/13 kolom (`DD/MM/YY`), ekspor bersih 13 kolom dan rekap Ledger via `umya-spreadsheet`, serta generator template unduhan. |
+| [src-tauri/src/commands.rs](src-tauri/src/commands.rs) & [src-tauri/src/lib.rs](src-tauri/src/lib.rs) | Registrasi command IPC Tauri, penjagaan sesi dan otorisasi `admin`, serta konfigurasi dialog sistem. |
+| [src/index.html](src/index.html), [src/style.css](src/style.css), [src/app.js](src/app.js) | Antarmuka desktop 5 tab modul kerja, layar login PIN, tema terang/gelap, tata letak cetak A4 landscape, dan pemanggilan IPC frontend. |
 
-### 1. Menjalankan Mode Pengembangan (Dev Mode)
+---
+
+## Dokumentasi
+
+* [CHANGELOG.md](CHANGELOG.md) mencatat riwayat rilis dan perubahan tiap versi berdasarkan Semantic Versioning.
+* [docs/FEATURES.md](docs/FEATURES.md) merinci aturan kerja dan berkas terkait untuk fitur `FEAT-01` hingga `FEAT-09`.
+* [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) menjelaskan arsitektur runtime, lokasi database lokal, kontrak perintah IPC, skema database, ADR, dan prosedur pemulihan bencana.
+
+---
+
+## Menjalankan dan Membangun
+
+Proyek membutuhkan Rust toolchain (edition 2021) dengan Cargo serta Node.js untuk menjalankan CLI Tauri (`@tauri-apps/cli`).
+
 ```bash
-# Jalankan mode dev Tauri:
+# Menjalankan aplikasi dalam mode pengembangan
 npm run dev
-# atau langsung via Cargo:
-cargo tauri dev
-```
 
-### 2. Membangun Installer Aplikasi (.dmg / .exe)
-```bash
-# Membangun bundle produksi teroptimasi:
+# Membangun bundel rilis produksi
 npm run build
 ```
-File installer otomatis dihasilkan di:
-- **macOS:** `src-tauri/target/release/bundle/dmg/` (Ukuran ~3.4 - 4.2 MB)
-- **Windows:** `src-tauri/target/release/bundle/nsis/` (Ukuran ~4 - 6 MB)
+
+Perintah build rilis menulis hasil bundel ke direktori `src-tauri/target/release/bundle/`. Pada rilis `1.6.5`, bundel aplikasi macOS (`Anda ERP.app`) berukuran 11,06 MiB.
 
 ---
 
-## 🧪 Pengujian & Verifikasi Otomatis
+## Pengujian
 
-Seluruh logika kritis diuji menggunakan suite pengujian otomatis:
 ```bash
-cd src-tauri
-# Menjalankan seluruh test suite:
-cargo test -- --nocapture
+# Memeriksa sintaks frontend JavaScript
+node --check src/app.js
 
-# Atau dalam mode rilis berkinerja tinggi:
-cargo test --release -- --nocapture
+# Menjalankan seluruh unit test dan integration test Rust
+cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-### Lingkup Verifikasi:
-1. `erp_core_tests`:
-   - `test_auth_pbkdf2_legacy_compatibility`: Memverifikasi kecocokan 100% hash PBKDF2 HMAC-SHA512 dengan database lama.
-   - `test_db_lifecycle_and_crud`: Menguji inisialisasi tabel, unit bawaan, pengaturan, operasi CRUD transaksi, dan paginasi SQL.
-   - `test_tax_recap_report_computation`: Menguji pemetaan 31 hari kalender harian, perhitungan omset, pajak 10%, dan nomor dokumen resmi.
-   - `test_backup_and_disaster_recovery`: Menguji backup online SQLite, pembuatan salinan darurat `.pre_restore.bak`, dan pemulihan data utuh.
-2. `optimizer_tests` & `smoke_verify`:
-   - Solver rekonsiliasi subset sum, ekspor in-place ke kolom E & F file Excel, serta injeksi formula dinamis `=SUM(F2:F...)`.
+Rangkaian `cargo test` menjalankan 18 kasus uji yang tersebar di unit test [src-tauri/src/lib.rs](src-tauri/src/lib.rs) (2 kasus), [tests/erp_core_tests.rs](tests/erp_core_tests.rs) (8 kasus: autentikasi, CRUD dan sinkronisasi tanggal fleksibel, rekap pajak, impor 13 kolom, Form 1, dan backup/restore), [tests/optimizer_tests.rs](tests/optimizer_tests.rs) (7 kasus: solver subset-sum, ekspor berumus 2 kolom/13 kolom, pencegahan bentrok jadwal kamar termasuk tanggal teks `DD/MM-YY`), serta [tests/smoke_verify.rs](tests/smoke_verify.rs) (1 kasus).
 
 ---
 
-## 📄 Lisensi
+## Lisensi
+
 Hak Cipta (c) 2024 Muhammad Syahid Ramadhon. Dilindungi undang-undang.
