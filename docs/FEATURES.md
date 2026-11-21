@@ -154,3 +154,21 @@ Daftar seluruh fitur aplikasi beserta kegunaan, aturan kerja, berkas yang mengim
   * Backend: `src-tauri/src/tax_report.rs` (`generate_tourism_report()`, `is_domestic_origin()`, `normalize_origin_label()`), `src-tauri/src/excel.rs` (`generate_import_template()`), `src-tauri/src/commands.rs` (`get_tourism_report()`)
   * Frontend: `src/app.js` (`initTourismModule()`, `loadTourismData()`), `src/index.html` (`#view-tourism`)
 * **Pengaturan:** Jumlah kamar (`anda_erp_room_capacity`, default `14`) dan jenis akomodasi (`anda_erp_acc_type`, default `Hotel Non Bintang`).
+
+---
+
+## Modul 8: Sertifikat Pelatihan Properti
+
+### FEAT-10: Generator & Arsip Sertifikat Training (`ANDA BUNGALOWS & RESTAURANT`)
+* **Kegunaan:** Menerbitkan, menyimpan, mengelola, dan mengekspor sertifikat penyelesaian program *training* secara konsisten sesuai desain Canva properti tanpa aplikasi desain eksternal.
+* **Pemicu:** Pengguna memilih menu langsung **Sertifikat Training** pada bilah navigasi utama (tersedia global untuk seluruh properti).
+* **Aturan Kerja:**
+  1. Mendukung pilihan ukuran kertas **F4 / Folio Horizontal (`330 x 215 mm`, bawaan)** dan **A4 Horizontal (`297 x 210 mm`)** dengan bingkai emas `#C67D24` berjarak `10 mm` di keempat sisi serta tipografi terbundel luring (`Nunito Sans Condensed`, `Source Serif Pro`, `Libre Baskerville`, `Roboto`).
+  2. Menomori sertifikat secara otomatis dengan format `000/ABR/YYYY` (`001/ABR/2026`, `002/ABR/2026`, di-reset otomatis menjadi `001` saat pergantian tahun terbit), tetap dapat disunting manual, dan dijamin unik (*case-insensitive*) di tabel SQLite `training_certificates`.
+  3. Menerima format tanggal fleksibel (`YYYY-MM-DD`, `DD/MM/YY`, dll.), menyarankan durasi berbahasa Inggris (`three-month`, `six-month`), mendukung input bidang/divisi tunggal maupun rotasi lintas divisi beserta durasinya dengan penyisipan otomatis `"the ... Department"` (mis. `in the Housekeeping Department (3 months) and the Food & Beverage Department (3 months)`), template predikat/kompetensi opsional, serta menulis rentang tanggal lengkap bertahun pada kedua tanggal (`from June 1, 2026 to November 21, 2026.`) sambil menghilangkan baris berulang `Awarded on` apabila tanggal terbit sama dengan tanggal selesai; tombol **Simpan & Tambah Berikutnya** tetap mempertahankan periode, divisi, predikat, program, sekolah, penandatangan, dan kertas.
+  4. Menggunakan satu sumber SVG kanonik untuk **pratinjau langsung di layar**, **ekspor PDF vektor** (`svg2pdf`), **unduhan PNG 300 DPI** (`resvg` + `tiny-skia`), serta **dialog cetak sistem borderless**.
+  5. Kontrol akses berbasis peran: `admin` dan `staff` dapat membuat sertifikat baru, memantau riwayat, mencari/memfilter berdasarkan tahun atau status, mencetak, dan mengekspor PDF/PNG; hanya `admin` yang dapat menyunting data tersimpan, membatalkan/mengaktifkan status (`active` / `revoked`), menghapus rekaman, mengganti gambar logo PNG atau tanda tangan digital opsional, serta mengubah pengaturan penandatangan bawaan.
+* **Berkas Terkait:**
+  * Backend: `src-tauri/src/certificate.rs` (`render_certificate_svg()`, `render_certificate_pdf_bytes()`, `render_certificate_png_bytes()`, `validate_and_save_asset()`), `src-tauri/src/db.rs` (`create_certificate()`, `update_certificate()`, `get_paginated_certificates()`, `get_next_certificate_number()`), `src-tauri/src/commands.rs` (`create_certificate()`, `preview_certificate_svg()`, `export_certificate_pdf()`, `export_certificate_png()`, `print_certificate()`)
+  * Frontend: `src/app.js` (`initCertificatesModule()`, `submitCertificateForm()`, `exportCertificateFormat()`, `printCertificateDocument()`), `src/index.html` (`#view-certificates`, `#dialog-cert-settings`), `src/style.css`, `src/assets/fonts/`
+* **Pengaturan:** Kunci `certSignerName` (bawaan `Agus Sumardi Wijaya`), `certSignerTitle` (bawaan `General Manager`), `certProgramName` (bawaan `hospitality training program`), `certPaperSize` (`F4`), `certShowSignature` (`0`), `certLogoFile`, dan `certSignatureFile` pada tabel `settings` serta folder `cert_assets/`.

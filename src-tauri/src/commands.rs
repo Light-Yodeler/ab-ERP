@@ -1,7 +1,10 @@
 use crate::auth::{self, UserProfile};
+use crate::certificate::{
+    self, CertificatePreviewInput, CertificateRenderData, CertificateSettingsPayload,
+};
 use crate::db::{
-    self, ImportLogRow, PaginatedRoomReservations, PaginatedTransactions, RoomReservationUpdate,
-    StorageInfo, UnitRow,
+    self, ImportLogRow, PaginatedCertificates, PaginatedRoomReservations, PaginatedTransactions,
+    RoomReservationUpdate, StorageInfo, TrainingCertificateInput, TrainingCertificateRow, UnitRow,
 };
 use crate::excel::{
     analyze_excel_file, export_room_reservations_to_excel, export_solution_to_excel,
@@ -22,7 +25,17 @@ pub struct AppState {
     pub db: Mutex<rusqlite::Connection>,
     pub db_path: PathBuf,
     pub archive_dir: PathBuf,
+    pub cert_assets_dir: PathBuf,
     pub current_user: Mutex<Option<UserProfile>>,
+}
+
+fn require_authenticated(state: &State<'_, AppState>) -> Result<UserProfile, String> {
+    state
+        .current_user
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clone()
+        .ok_or_else(|| "Sesi belum masuk: silakan login terlebih dahulu.".to_string())
 }
 
 fn require_admin_id(state: &State<'_, AppState>) -> Result<i64, String> {
@@ -469,8 +482,11 @@ pub fn download_excel_template(unit: Option<String>) -> Result<String, String> {
     ))
 }
 
-#[tauri::command]
-pub fn print_report(window: tauri::WebviewWindow, title: Option<String>) -> Result<(), String> {
+fn run_print_with_margins(
+    window: tauri::WebviewWindow,
+    title: Option<String>,
+    margin_pts: f64,
+) -> Result<(), String> {
     if let Some(t) = &title {
         let _ = window.set_title(t);
     }
@@ -490,16 +506,26 @@ pub fn print_report(window: tauri::WebviewWindow, title: Option<String>) -> Resu
                     if let Some(info) = print_info {
                         // 1 = NSPaperOrientationLandscape (0 = Portrait)
                         let _: () = msg_send![info, setOrientation: 1isize];
-                        let _: () = msg_send![info, setLeftMargin: 15.0f64];
-                        let _: () = msg_send![info, setRightMargin: 15.0f64];
-                        let _: () = msg_send![info, setTopMargin: 15.0f64];
-                        let _: () = msg_send![info, setBottomMargin: 15.0f64];
+                        let _: () = msg_send![info, setLeftMargin: margin_pts];
+                        let _: () = msg_send![info, setRightMargin: margin_pts];
+                        let _: () = msg_send![info, setTopMargin: margin_pts];
+                        let _: () = msg_send![info, setBottomMargin: margin_pts];
                     }
                 }
             }
         }
     }
     window.print().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn print_report(window: tauri::WebviewWindow, title: Option<String>) -> Result<(), String> {
+    run_print_with_margins(window, title, 15.0f64)
+}
+
+#[tauri::command]
+pub fn print_certificate(window: tauri::WebviewWindow, title: Option<String>) -> Result<(), String> {
+    run_print_with_margins(window, title, 0.0f64)
 }
 
 #[tauri::command]
@@ -631,10 +657,303 @@ pub fn restore_database_dialog(state: State<'_, AppState>) -> Result<String, Str
     // Perform file restore
     db::restore_database(&state.db_path, &backup_file)?;
 
-    // Reopen SQLite connection to switch to restored DB cleanly
-    let new_conn = db::open_connection(&state.db_path)
+    // Reopen SQLite connection via init_db so pre-v1.7/v1.7.0 backups run additive migrations
+    let new_conn = db::init_db(&state.db_path)
         .map_err(|e| format!("Gagal memuat ulang koneksi database: {}", e))?;
     *conn = new_conn;
 
     Ok("Database berhasil dipulihkan dari cadangan!".to_string())
+}
+
+// ==========================================
+// Training Certificates Commands
+// ==========================================
+
+fn build_render_data(
+    state: &State<'_, AppState>,
+    payload: &CertificatePreviewInput,
+) -> Result<CertificateRenderData, String> {
+    let settings = {
+        let conn = state.db.lock().map_err(|e| e.to_string())?;
+        db::get_settings(&conn)?
+    };
+    Ok(CertificateRenderData::from_preview_input(
+        payload,
+        &state.cert_assets_dir,
+        &settings,
+    ))
+}
+
+#[tauri::command]
+pub fn get_certificates(
+    state: State<'_, AppState>,
+    year: Option<String>,
+    status: Option<String>,
+    search: Option<String>,
+    page: Option<usize>,
+    page_size: Option<usize>,
+) -> Result<PaginatedCertificates, String> {
+    require_authenticated(&state)?;
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    db::get_paginated_certificates(
+        &conn,
+        year.as_deref(),
+        status.as_deref(),
+        search.as_deref(),
+        page.unwrap_or(1),
+        page_size.unwrap_or(25),
+    )
+}
+
+#[tauri::command]
+pub fn get_certificate_years(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+    require_authenticated(&state)?;
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    db::get_certificate_years(&conn)
+}
+
+#[tauri::command]
+pub fn get_next_certificate_no(
+    state: State<'_, AppState>,
+    year: Option<i32>,
+) -> Result<String, String> {
+    require_authenticated(&state)?;
+    let target_year = year.unwrap_or_else(|| chrono::Datelike::year(&chrono::Local::now().date_naive()));
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    db::get_next_certificate_number(&conn, target_year)
+}
+
+#[tauri::command]
+pub fn create_certificate(
+    state: State<'_, AppState>,
+    payload: TrainingCertificateInput,
+) -> Result<TrainingCertificateRow, String> {
+    let caller = require_authenticated(&state)?;
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    db::create_certificate(&conn, &payload, Some(&caller.username))
+}
+
+#[tauri::command]
+pub fn update_certificate(
+    state: State<'_, AppState>,
+    id: i64,
+    payload: TrainingCertificateInput,
+) -> Result<TrainingCertificateRow, String> {
+    require_admin(&state)?;
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    db::update_certificate(&conn, id, &payload)
+}
+
+#[tauri::command]
+pub fn set_certificate_status(
+    state: State<'_, AppState>,
+    id: i64,
+    status: String,
+) -> Result<TrainingCertificateRow, String> {
+    require_admin(&state)?;
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    db::set_certificate_status(&conn, id, &status)
+}
+
+#[tauri::command]
+pub fn delete_certificate(state: State<'_, AppState>, id: i64) -> Result<(), String> {
+    require_admin(&state)?;
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    db::delete_certificate(&conn, id)
+}
+
+#[tauri::command]
+pub fn preview_certificate_svg(
+    state: State<'_, AppState>,
+    payload: CertificatePreviewInput,
+) -> Result<String, String> {
+    require_authenticated(&state)?;
+    let data = build_render_data(&state, &payload)?;
+    Ok(certificate::render_certificate_svg(&data))
+}
+
+#[tauri::command]
+pub fn export_certificate_pdf(
+    state: State<'_, AppState>,
+    payload: CertificatePreviewInput,
+) -> Result<String, String> {
+    require_authenticated(&state)?;
+    let data = build_render_data(&state, &payload)?;
+    let default_name = format!(
+        "Certificate_{}_{}.pdf",
+        sanitize_filename_segment(&data.certificate_no),
+        sanitize_filename_segment(&data.recipient_name)
+    );
+    let dialog = rfd::FileDialog::new()
+        .add_filter("PDF Document (*.pdf)", &["pdf"])
+        .set_file_name(&default_name)
+        .save_file();
+
+    let Some(target_path) = dialog else {
+        return Ok("Ekspor dibatalkan oleh pengguna.".to_string());
+    };
+
+    certificate::export_certificate_pdf(&data, &target_path)?;
+    Ok(format!(
+        "Sertifikat PDF berhasil disimpan ke: {}",
+        target_path.display()
+    ))
+}
+
+#[tauri::command]
+pub fn export_certificate_png(
+    state: State<'_, AppState>,
+    payload: CertificatePreviewInput,
+) -> Result<String, String> {
+    require_authenticated(&state)?;
+    let data = build_render_data(&state, &payload)?;
+    let default_name = format!(
+        "Certificate_{}_{}.png",
+        sanitize_filename_segment(&data.certificate_no),
+        sanitize_filename_segment(&data.recipient_name)
+    );
+    let dialog = rfd::FileDialog::new()
+        .add_filter("PNG Image (*.png)", &["png"])
+        .set_file_name(&default_name)
+        .save_file();
+
+    let Some(target_path) = dialog else {
+        return Ok("Ekspor dibatalkan oleh pengguna.".to_string());
+    };
+
+    certificate::export_certificate_png(&data, &target_path)?;
+    Ok(format!(
+        "Sertifikat PNG (300 DPI) berhasil disimpan ke: {}",
+        target_path.display()
+    ))
+}
+
+#[tauri::command]
+pub fn get_certificate_settings(
+    state: State<'_, AppState>,
+) -> Result<CertificateSettingsPayload, String> {
+    require_authenticated(&state)?;
+    let settings = {
+        let conn = state.db.lock().map_err(|e| e.to_string())?;
+        db::get_settings(&conn)?
+    };
+    Ok(certificate::build_certificate_settings_payload(
+        &state.cert_assets_dir,
+        &settings,
+    ))
+}
+
+#[tauri::command]
+pub fn update_certificate_settings(
+    state: State<'_, AppState>,
+    signer_name: String,
+    signer_title: String,
+    program_name: String,
+    paper_size: String,
+    show_signature: bool,
+) -> Result<CertificateSettingsPayload, String> {
+    require_admin(&state)?;
+    let clean_signer = signer_name.trim();
+    let clean_title = signer_title.trim();
+    let clean_prog = program_name.trim();
+    if clean_signer.is_empty() || clean_title.is_empty() || clean_prog.is_empty() {
+        return Err("Nama penandatangan, jabatan, dan nama program tidak boleh kosong.".to_string());
+    }
+    let clean_paper = if paper_size.trim().eq_ignore_ascii_case("A4") {
+        "A4"
+    } else {
+        "F4"
+    };
+
+    let mut updates = HashMap::new();
+    updates.insert("certSignerName".to_string(), clean_signer.to_string());
+    updates.insert("certSignerTitle".to_string(), clean_title.to_string());
+    updates.insert("certProgramName".to_string(), clean_prog.to_string());
+    updates.insert("certPaperSize".to_string(), clean_paper.to_string());
+    updates.insert(
+        "certShowSignature".to_string(),
+        if show_signature { "1" } else { "0" }.to_string(),
+    );
+
+    let settings = {
+        let conn = state.db.lock().map_err(|e| e.to_string())?;
+        db::update_settings(&conn, &updates)?;
+        db::get_settings(&conn)?
+    };
+    Ok(certificate::build_certificate_settings_payload(
+        &state.cert_assets_dir,
+        &settings,
+    ))
+}
+
+#[tauri::command]
+pub fn upload_certificate_asset(
+    state: State<'_, AppState>,
+    kind: String,
+) -> Result<Option<CertificateSettingsPayload>, String> {
+    require_admin(&state)?;
+    let clean_kind = kind.trim();
+    let key_name = match clean_kind {
+        "logo" => "certLogoFile",
+        "signature" => "certSignatureFile",
+        _ => return Err("Jenis aset sertifikat tidak valid.".to_string()),
+    };
+
+    let pick_target = rfd::FileDialog::new()
+        .add_filter("Gambar PNG / JPEG (*.png, *.jpg, *.jpeg)", &["png", "jpg", "jpeg"])
+        .pick_file();
+
+    let Some(src_path) = pick_target else {
+        return Ok(None);
+    };
+
+    let filename =
+        certificate::validate_and_save_asset(&state.cert_assets_dir, clean_kind, &src_path)?;
+    let mut updates = HashMap::new();
+    updates.insert(key_name.to_string(), filename);
+    if clean_kind == "signature" {
+        updates.insert("certShowSignature".to_string(), "1".to_string());
+    }
+
+    let settings = {
+        let conn = state.db.lock().map_err(|e| e.to_string())?;
+        db::update_settings(&conn, &updates)?;
+        db::get_settings(&conn)?
+    };
+    Ok(Some(certificate::build_certificate_settings_payload(
+        &state.cert_assets_dir,
+        &settings,
+    )))
+}
+
+#[tauri::command]
+pub fn clear_certificate_asset(
+    state: State<'_, AppState>,
+    kind: String,
+) -> Result<CertificateSettingsPayload, String> {
+    require_admin(&state)?;
+    let clean_kind = kind.trim();
+    let key_name = match clean_kind {
+        "logo" => "certLogoFile",
+        "signature" => "certSignatureFile",
+        _ => return Err("Jenis aset sertifikat tidak valid.".to_string()),
+    };
+
+    certificate::remove_custom_asset(&state.cert_assets_dir, clean_kind)?;
+
+    let mut updates = HashMap::new();
+    updates.insert(key_name.to_string(), String::new());
+    if clean_kind == "signature" {
+        updates.insert("certShowSignature".to_string(), "0".to_string());
+    }
+
+    let settings = {
+        let conn = state.db.lock().map_err(|e| e.to_string())?;
+        db::update_settings(&conn, &updates)?;
+        db::get_settings(&conn)?
+    };
+    Ok(certificate::build_certificate_settings_payload(
+        &state.cert_assets_dir,
+        &settings,
+    ))
 }

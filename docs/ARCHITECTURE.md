@@ -22,6 +22,7 @@ Aplikasi menggunakan direktori data lokal terstandarisasi berdasarkan sistem ope
 | :--- | :--- | :--- |
 | **Lokasi Database** | `com.andabungalows.erp/laporan_bapenda.sqlite` | Berkas database SQLite utama |
 | **Direktori Arsip** | `com.andabungalows.erp/arsip_excel/` | Salinan fisik berkas spreadsheet yang diimpor |
+| **Aset Sertifikat** | `com.andabungalows.erp/cert_assets/` | Gambar PNG/JPEG kustom untuk logo dan tanda tangan digital opsional |
 | **Mode SQLite** | `PRAGMA journal_mode=WAL` | Menjamin konkurensi baca-tulis tinggi dan crash-safe |
 | **Skema Synchronous** | `PRAGMA synchronous=NORMAL` | Keseimbangan integritas ACID dan kecepatan tulis disk |
 
@@ -69,6 +70,21 @@ Seluruh pemanggilan dari antarmuka pengguna dilakukan melalui pembungkus `invoke
 | `get_units` | `{}` | `Vec<UnitRow>` | Mengambil daftar unit usaha aktif |
 | `add_unit` | `{ code, name, defaultNpwpd?, defaultAddress? }` | `i64` | Menambah unit usaha baru |
 | `update_unit` | `{ id, name, defaultNpwpd?, defaultAddress?, isActive }` | `()` | Memperbarui data unit usaha |
+| `get_certificates` | `{ year?, status?, search?, page?, pageSize? }` | `PaginatedCertificates` | Mengambil riwayat sertifikat training dengan filter tahun, status, pencarian, dan paginasi |
+| `get_certificate_years` | `{}` | `Vec<String>` | Mengambil daftar tahun terbit sertifikat unik menurun |
+| `get_next_certificate_no` | `{ year? }` | `String` | Menghasilkan nomor urut `000/ABR/YYYY` berikutnya untuk tahun tertentu |
+| `create_certificate` | `{ payload }` | `TrainingCertificateRow` | Memvalidasi dan menyimpan sertifikat training baru ke SQLite |
+| `update_certificate` | `{ id, payload }` | `TrainingCertificateRow` | Memperbarui data sertifikat tersimpan (khusus Admin) |
+| `set_certificate_status` | `{ id, status }` | `TrainingCertificateRow` | Mengubah status sertifikat `active` atau `revoked` (khusus Admin) |
+| `delete_certificate` | `{ id }` | `()` | Menghapus permanen rekaman sertifikat (khusus Admin) |
+| `preview_certificate_svg` | `{ payload }` | `String` | Menghasilkan dokumen SVG kanonik F4/A4 untuk pratinjau langsung |
+| `export_certificate_pdf` | `{ payload }` | `String` | Mengekspor sertifikat PDF vektor presisi milimeter lewat dialog simpan berkas |
+| `export_certificate_png` | `{ payload }` | `String` | Mengekspor gambar PNG resolusi 300 DPI lewat dialog simpan berkas |
+| `get_certificate_settings` | `{}` | `CertificateSettingsPayload` | Mengambil pengaturan penandatangan bawaan, kertas, dan URI pratinjau logo/tanda tangan |
+| `update_certificate_settings` | `{ signerName, signerTitle, programName, paperSize, showSignature }` | `CertificateSettingsPayload` | Menyimpan pengaturan default sertifikat (khusus Admin) |
+| `upload_certificate_asset` | `{ kind }` | `CertificateSettingsPayload` | Memvalidasi magic byte/ukuran dan mengunggah aset PNG/JPEG `logo` atau `signature` (khusus Admin) |
+| `clear_certificate_asset` | `{ kind }` | `CertificateSettingsPayload` | Menghapus aset kustom dan kembali ke logo bawaan / tanda tangan basah (khusus Admin) |
+| `print_certificate` | `{ title? }` | `()` | Membuka dialog pencetakan sistem landscape tanpa margin (borderless) untuk sertifikat |
 
 ---
 
@@ -173,6 +189,35 @@ CREATE INDEX IF NOT EXISTS idx_room_res_unit_date ON room_reservations(unit, dat
 CREATE INDEX IF NOT EXISTS idx_room_res_trans_id ON room_reservations(transaction_id);
 ```
 
+### Tabel `training_certificates`
+Menyimpan riwayat sertifikat training peserta, nomor unik tahunan, periode, status, dan snapshot penandatangan/ukuran kertas.
+```sql
+CREATE TABLE IF NOT EXISTS training_certificates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    certificate_no TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    recipient_name TEXT NOT NULL,
+    duration_text TEXT NOT NULL,
+    program_name TEXT NOT NULL DEFAULT 'hospitality training program',
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    issued_date TEXT NOT NULL,
+    department TEXT,
+    institution TEXT,
+    achievement_text TEXT,
+    notes TEXT,
+    signer_name TEXT NOT NULL DEFAULT 'Agus Sumardi Wijaya',
+    signer_title TEXT NOT NULL DEFAULT 'General Manager',
+    paper_size TEXT NOT NULL DEFAULT 'F4' CHECK(paper_size IN ('F4', 'A4')),
+    status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'revoked')),
+    created_by TEXT,
+    created_at DATETIME DEFAULT (datetime('now', 'localtime')),
+    updated_at DATETIME DEFAULT (datetime('now', 'localtime'))
+);
+CREATE INDEX IF NOT EXISTS idx_cert_issued_date ON training_certificates(issued_date);
+CREATE INDEX IF NOT EXISTS idx_cert_status ON training_certificates(status);
+CREATE INDEX IF NOT EXISTS idx_cert_recipient ON training_certificates(recipient_name);
+```
+
 ---
 
 ## 5. Architectural Decision Records (ADR)
@@ -205,6 +250,13 @@ CREATE INDEX IF NOT EXISTS idx_room_res_trans_id ON room_reservations(transactio
 * **Konsekuensi & Trade-off:**
   * Keuntungan: Data reservasi 13 kolom tersaji lengkap di antarmuka, berkas ekspor bersih dan mandiri tanpa perlu menimpa berkas sumber, serta langsung kompatibel dengan modul impor.
   * Kompromi: Memerlukan dialog penyimpanan berkas baru (`pick_save_file`) saat pengguna mengekspor hasil format 13 kolom.
+
+### ADR-05: Arsitektur Single-Source-of-Truth SVG dengan Font Terbundel untuk Sertifikat
+* **Konteks:** Modul Sertifikat Training (`FEAT-10`) menuntut kesamaan tipografi, warna emas `#C67D24`, logo PNG transparan, dan koordinat milimeter kertas F4 (`330 x 215 mm`) maupun A4 (`297 x 210 mm`) di seluruh jalur keluaran (pratinjau UI, PDF vektor, PNG resolusi tinggi, dan pencetakan sistem) secara luring. Mengandalkan tangkapan layar HTML DOM atau font sistem macOS berisiko menghasilkan pergeseran spasi dan font fallback.
+* **Keputusan:** Backend Rust menyusun satu berkas SVG kanonik dalam satuan `mm` via `render_certificate_svg()` dengan logo PNG bawaan dan 5 berkas TTF statis tersemat ke biner (`include_bytes!`) serta disajikan lewat `@font-face` lokal di `src/assets/fonts/`. SVG yang sama diubah menjadi PDF vektor oleh `svg2pdf` (pada skala `96 DPI` ke ukuran halaman milimeter eksak) dan menjadi PNG `300 DPI` oleh `resvg` + `tiny-skia`.
+* **Konsekuensi & Trade-off:**
+  * Keuntungan: Nol perbedaan tata letak antara pratinjau langsung, PDF cetak, PNG unduhan, dan dialog print sistem; tetap bekerja penuh tanpa internet dan sesuai dengan kebijakan CSP Tauri `default-src 'self'`.
+  * Kompromi: Membundel 5 berkas TTF statis dan logo PNG menambah ukuran biner rilis sekitar beberapa ratus kilobyte, namun menjamin presisi cetak permanen lintas versi sistem operasi.
 ---
 
 ## 6. Prosedur Operasional & Pemulihan Bencana (Runbook)

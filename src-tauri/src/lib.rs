@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod certificate;
 pub mod commands;
 pub mod db;
 pub mod excel;
@@ -7,17 +8,23 @@ pub mod optimizer;
 pub mod tax_report;
 
 use commands::*;
+use std::path::Path;
 use std::sync::Mutex;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let (db_path, archive_dir) = db::get_default_paths();
+    let cert_assets_dir = db_path
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .join("cert_assets");
     let conn = db::init_db_with_migration(&db_path, true).expect("failed to initialize sqlite database");
 
     let app_state = AppState {
         db: Mutex::new(conn),
         db_path,
         archive_dir,
+        cert_assets_dir,
         current_user: Mutex::new(None),
     };
 
@@ -70,6 +77,22 @@ pub fn run() {
             get_storage_info,
             backup_database_dialog,
             restore_database_dialog,
+            // Training Certificates
+            get_certificates,
+            get_certificate_years,
+            get_next_certificate_no,
+            create_certificate,
+            update_certificate,
+            set_certificate_status,
+            delete_certificate,
+            preview_certificate_svg,
+            export_certificate_pdf,
+            export_certificate_png,
+            get_certificate_settings,
+            update_certificate_settings,
+            upload_certificate_asset,
+            clear_certificate_asset,
+            print_certificate,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

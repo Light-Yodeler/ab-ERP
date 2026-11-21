@@ -1,6 +1,6 @@
 [package]
 name = "excel-subset-app"
-version = "1.6.5"
+version = "1.7.4"
 description = "Aplikasi Desktop Subset-Sum Excel Ultra-Ringan"
 authors = ["Muhammad Syahid Ramadhon"]
 edition = "2021"
@@ -17,6 +17,9 @@ path = "../tests/smoke_verify.rs"
 [[test]]
 name = "erp_core_tests"
 path = "../tests/erp_core_tests.rs"
+[[test]]
+name = "certificate_tests"
+path = "../tests/certificate_tests.rs"
 
 
 
@@ -36,6 +39,10 @@ pbkdf2 = { version = "0.12", features = ["hmac"] }
 sha2 = "0.10"
 hex = "0.4"
 dirs = "5.0"
+svg2pdf = "0.13"
+resvg = { version = "0.45", default-features = false, features = ["text", "raster-images"] }
+tiny-skia = "0.11"
+base64 = "0.22"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"

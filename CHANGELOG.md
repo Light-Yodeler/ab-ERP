@@ -11,6 +11,56 @@ Kategori yang dipakai: `Added` (fitur baru), `Changed` (perilaku berubah), `Fixe
 
 ---
 
+## [1.7.4] - 2026-11-22
+
+### Fixed
+* Penyelesaian seluruh temuan audit kode `/open-code-review-delegate` dan Karpathy Guidelines pada modul **Sertifikat Training (`FEAT-10`)**:
+  * **Ukuran Kertas Cetak & Kebersihan Mode Cetak** (`src/style.css`, `src/app.js`): Menambahkan kelas `html.printing-certificate` agar aturan cetak global `285mm` pada laporan pajak tidak mengecilkan sertifikat F4 (`330 x 215 mm`) maupun A4 (`297 x 210 mm`), serta menambahkan pemulihan mode cetak cadangan (`matchMedia`, `focus`, dan sebelum `print_report`) saat `afterprint` tidak terpanggil di WKWebView macOS.
+  * **Tanggal Default, State Form & Keamanan Sesi** (`src/app.js`, `src/index.html`): Menghitung `Tanggal Mulai` default secara relatif 3 bulan ke belakang dari tanggal hari ini agar valid sepanjang tahun, menambahkan `certPreviewSeq` anti-race pada pratinjau SVG, merapikan transisi state Pratinjau/Simpan/Logout, serta menghapus `novalidate` dan `src=""` kosong pada dialog pengaturan sertifikat.
+  * **Integritas Database, Aset & Layout TTD Digital** (`src-tauri/src/db.rs`, `src-tauri/src/commands.rs`, `src-tauri/src/certificate.rs`, `tests/certificate_tests.rs`): Menjalankan migrasi `db::init_db` setelah pemulihan cadangan SQLite, meng-clamp `page` terhadap `total_pages` sebelum menghitung `offset` paginasi, menduplikasi ulang validasi lewat `resolve_certificate_fields()`, melepas lock DB saat I/O berkas aset dan mengembalikan `Option` saat unggahan dibatalkan, menulis aset via berkas sementara sebelum menghapus ekstensi lama, menyesuaikan posisi TTD digital agar bebas tumpang tindih pada paragraf panjang, menghapus kode mati, serta menambah regression test.
+
+
+---
+
+## [1.7.3] - 2026-11-22
+
+### Changed
+* Penyatuan frasa departemen tunggal ke baris pertama isi **Sertifikat Training (`FEAT-10`)** (`src-tauri/src/certificate.rs`, `tests/certificate_tests.rs`):
+  * Saat hanya memilih satu departemen tanpa rotasi, `build_body_lines()` menggabungkan program dan departemen pada baris pertama (`for successfully completing the ... in the ... Department`) serta alamat dan tanggal pada baris kedua (`at Anda Bungalows & Restaurant, from ... to ...`), sehingga dua baris utama tampak seimbang tanpa baris tengah pendek yang terasa kosong.
+  * Mode rotasi dua atau lebih departemen tetap menempatkan daftar departemen rotasi pada baris tengah terpusat tersendiri.
+
+---
+
+## [1.7.2] - 2026-11-21
+
+### Changed
+* Penyeragaman format tanggal lengkap dan penulisan departemen formal hotel pada modul **Sertifikat Training (`FEAT-10`)** (`src-tauri/src/certificate.rs`, `src/index.html`, `src/app.js`, `tests/certificate_tests.rs`):
+  * `format_english_date_range()` kini selalu mencantumkan tahun pada tanggal awal maupun tanggal akhir (`from June 1, 2026 to November 21, 2026.`), sementara penekanan anti-pengulangan `Awarded on` saat tanggal terbit sama dengan tanggal selesai tetap dipertahankan.
+  * `format_divisions_phrase()` kini menyisipkan awalan `"the ... Department"` secara otomatis tanpa duplikasi pada penempatan tunggal maupun rotasi lintas divisi (contoh: `in the Housekeeping Department (3 months) and the Food & Beverage Department (3 months)`), disertai penyesuaian pembungkusan baris teks untuk kertas F4 dan A4.
+
+---
+
+## [1.7.1] - 2026-11-21
+
+### Changed
+* Penyempurnaan deskripsi dan kalimat penutup pada modul **Sertifikat Training (`FEAT-10`)** (`src-tauri/src/certificate.rs`, `src-tauri/src/db.rs`, `src/index.html`, `src/style.css`, `src/app.js`, `tests/certificate_tests.rs`):
+  * Menambahkan kolom `achievement_text` pada tabel `training_certificates` (dengan migrasi otomatis `ALTER TABLE` untuk database yang sudah ada) agar kalimat predikat/kompetensi peserta ikut tersimpan permanen dan dapat dicari lewat tabel riwayat.
+  * Menambahkan pembuat baris **Bidang / Divisi Training** dinamis pada formulir utama yang mendukung penempatan tunggal maupun rotasi 2+ divisi beserta durasinya (contoh: `in Housekeeping (3 months) and Restaurant Waiter (3 months)`), ditambah pilihan preset predikat kompetensi berbahasa Inggris yang bebas disunting dan pembungkusan baris teks terpusat otomatis yang proporsional untuk F4 maupun A4.
+  * Meringkas rentang tanggal dalam tahun yang sama menjadi `from June 1 to November 21, 2026.` serta menyembunyikan baris `Awarded on ...` secara otomatis apabila tanggal terbit sama dengan tanggal selesai agar kalimat sertifikat tidak berulang.
+
+---
+
+## [1.7.0] - 2026-11-21
+
+### Added
+* **Modul Sertifikat Training (`FEAT-10`)** (`src-tauri/src/certificate.rs`, `src-tauri/src/db.rs`, `src-tauri/src/commands.rs`, `src/index.html`, `src/style.css`, `src/app.js`, `tests/certificate_tests.rs`):
+  * Menambahkan menu navigasi utama **Sertifikat Training** (global untuk properti `ANDA BUNGALOWS & RESTAURANT`) beserta pratinjau langsung WYSIWYG, form input cepat dengan tombol **Simpan & Tambah Berikutnya**, saran durasi otomatis bahasa Inggris, dan format tanggal cetak `Month Day, Year`.
+  * Dukungan ukuran kertas bawaan **F4 / Folio Horizontal (`330 x 215 mm`)** dengan bingkai emas `#C67D24` inset `10 mm` di keempat sisi serta opsi **A4 Horizontal (`297 x 210 mm`)**, lengkap dengan 5 berkas font OFL terbundel (`Nunito Sans Condensed`, `Source Serif Pro`, `Libre Baskerville`, `Roboto`) dan logo PNG transparan bawaan.
+  * Satu sumber SVG kanonik untuk ekspor **PDF vektor** (`svg2pdf`), **PNG 300 DPI** (`resvg` + `tiny-skia`), dan **cetak printer sistem tanpa margin**.
+  * Penyimpanan persisten pada tabel SQLite `training_certificates` dengan penomoran otomatis berurutan `000/ABR/YYYY` yang reset tiap pergantian tahun terbit, pencarian/filter tahun/status serta paginasi SQL, kontrol peran (`staff` dapat membuat dan mengekspor/mencetak, `admin` dapat menyunting, membatalkan `revoked`, menghapus, dan mengatur logo/TTD/penandatangan default via dialog pengaturan).
+
+---
+
 ## [1.6.5] - 2026-11-21
 
 ### Fixed

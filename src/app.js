@@ -260,6 +260,62 @@
         ],
       };
     }
+    if (cmd === 'get_certificate_settings') {
+      return {
+        signer_name: 'Agus Sumardi Wijaya',
+        signer_title: 'General Manager',
+        program_name: 'hospitality training program',
+        paper_size: 'F4',
+        show_signature: false,
+        has_custom_logo: false,
+        has_custom_signature: false,
+        logo_data_uri: '',
+        signature_data_uri: null,
+      };
+    }
+    if (cmd === 'get_next_certificate_no') {
+      const y = args.year || new Date().getFullYear();
+      return `001/ABR/${y}`;
+    }
+    if (cmd === 'get_certificate_years') {
+      return [String(new Date().getFullYear())];
+    }
+    if (cmd === 'get_certificates') {
+      return {
+        items: [],
+        total_count: 0,
+        active_count: 0,
+        revoked_count: 0,
+        page: args.page || 1,
+        page_size: args.pageSize || 25,
+        total_pages: 1,
+      };
+    }
+    if (cmd === 'preview_certificate_svg') {
+      const p = args.payload || {};
+      const isA4 = String(p.paper_size || 'F4').toUpperCase() === 'A4';
+      const w = isA4 ? 297 : 330;
+      const h = isA4 ? 210 : 215;
+      const cx = w / 2;
+      const fmtMockDept = (s) => {
+        const clean = String(s).trim().replace(/^the\s+/i, '');
+        const m = /^(.*?)\s*\(([^()]+)\)\s*$/.exec(clean);
+        const baseRaw = m ? m[1].trim() : clean;
+        const base = /department$|dept\.?$/i.test(baseRaw) ? baseRaw : `${baseRaw} Department`;
+        return m ? `the ${base} (${m[2].trim()})` : `the ${base}`;
+      };
+      const deptItems = String(p.department || '').split(';').map(s => s.trim()).filter(Boolean).map(fmtMockDept);
+      const divLine = deptItems.length ? `in ${escapeHtml(deptItems.join(' and '))}` : '';
+      const achLine = p.achievement_text ? `<text x="${cx}" y="157" text-anchor="middle" font-size="3.7" fill="#000000">${escapeHtml(p.achievement_text)}</text>` : '';
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}mm" height="${h}mm" viewBox="0 0 ${w} ${h}"><rect x="0" y="0" width="${w}" height="${h}" fill="#FFFFFF"/><rect x="10" y="10" width="${w - 20}" height="${h - 20}" fill="none" stroke="#C67D24" stroke-width="0.53"/><text x="${w - 20}" y="21.25" text-anchor="end" font-size="3.53" fill="#545454">Certificate No. ${escapeHtml(p.certificate_no || '[000/ABR/YYYY]')}</text><text x="${cx}" y="86" text-anchor="middle" font-size="14" fill="#1F1F1F">Certificate of Completion</text><text x="${cx}" y="130" text-anchor="middle" font-weight="700" font-size="12" fill="#000000">${escapeHtml(p.recipient_name || '[Recipient Name]')}</text><text x="${cx}" y="149" text-anchor="middle" font-size="3.8" fill="#000000">${divLine}</text>${achLine}</svg>`;
+    }
+    if (cmd === 'print_certificate') {
+      window.print();
+      return;
+    }
+    if (cmd === 'export_certificate_pdf' || cmd === 'export_certificate_png') {
+      return 'Berkas sertifikat berhasil diekspor (Mode Mock).';
+    }
     throw new Error(`Perintah '${cmd}' belum didukung dalam mode mock.`);
   }
 
@@ -282,6 +338,22 @@
     tourismMonth: '',
     tourismRoomCapacity: Number(localStorage.getItem('anda_erp_room_capacity')) || 14,
     tourismAccType: localStorage.getItem('anda_erp_acc_type') || 'Hotel Non Bintang',
+    // Certificates Module State
+    certPage: 1,
+    certTotalPages: 1,
+    certPageSize: 25,
+    certYear: 'all',
+    certStatus: 'all',
+    certSearch: '',
+    certEditingId: null,
+    certEditingStatus: 'active',
+    certManualNo: false,
+    certManualDuration: false,
+    certInitialized: false,
+    certSettings: null,
+    certRows: [],
+    certPreviewTimer: null,
+    certPreviewSeq: 0,
     // Optimizer Module State
     optFilePath: null,
     optAnalysis: null,
@@ -323,6 +395,14 @@
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  }
+
+  function getMonthsAgoLocalDateStr(monthsBack) {
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth() - monthsBack, 1);
+    const maxDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    d.setDate(Math.min(now.getDate(), maxDay));
+    return getSystemLocalDateStr(d);
   }
 
   function getSystemLocalMonthStr(d = new Date()) {
@@ -436,6 +516,14 @@
       skipDupRadio.checked = true;
     }
 
+    const btnCertSettings = document.getElementById('btn-cert-settings');
+    if (btnCertSettings) {
+      btnCertSettings.classList.toggle('hidden', !isAdmin);
+    }
+    if (state.certInitialized) {
+      renderCertificateHistoryRows();
+    }
+
     updateLedgerModeUI();
   }
 
@@ -541,6 +629,7 @@
   }
 
   function logout() {
+    resetCertificatesSessionState();
     document.title = APP_DEFAULT_TITLE;
     if (isTauri) {
       invoke('set_window_title', { title: APP_DEFAULT_TITLE }).catch(() => {});
@@ -672,6 +761,8 @@
       await loadImportLogs();
     } else if (state.activeTab === 'tourism') {
       await loadTourismData();
+    } else if (state.activeTab === 'certificates') {
+      await loadCertificatesModuleView();
     }
   }
 
@@ -694,6 +785,11 @@
       }
     });
 
+    const navCertBtn = document.getElementById('nav-tab-certificates');
+    if (navCertBtn) {
+      navCertBtn.classList.toggle('active', tabName === 'certificates');
+    }
+
     // Highlight parent dropdown toggle
     const tabToDropdown = {
       recap: 'pajak',
@@ -703,10 +799,10 @@
       optimizer: 'audit',
     };
 
-    const targetGroup = tabToDropdown[tabName] || 'pajak';
+    const targetGroup = tabToDropdown[tabName] || null;
     document.querySelectorAll('.nav-dropdown').forEach(dropdown => {
       const toggle = dropdown.querySelector('.nav-dropdown-toggle');
-      if (dropdown.dataset.dropdown === targetGroup) {
+      if (targetGroup && dropdown.dataset.dropdown === targetGroup) {
         toggle?.classList.add('active');
       } else {
         toggle?.classList.remove('active');
@@ -781,6 +877,16 @@
         }
       });
     });
+
+    // Direct Top-Level Nav Buttons (Sertifikat Training)
+    const navCertBtn = document.getElementById('nav-tab-certificates');
+    if (navCertBtn) {
+      navCertBtn.addEventListener('click', async () => {
+        closeAllDropdowns();
+        switchTab('certificates');
+        await loadActiveView();
+      });
+    }
 
     // Close dropdowns on outside click or Escape key
     document.addEventListener('click', () => {
@@ -2869,6 +2975,7 @@
     const btnTriggerPrint = document.getElementById('btn-trigger-print');
     if (btnTriggerPrint) {
       btnTriggerPrint.addEventListener('click', async () => {
+        cleanupCertificatePrintMode();
         const docNum = state.currentRecap?.document_number;
         const reportTitle = getCleanReportFileName(docNum) || document.title;
         document.title = reportTitle;
@@ -2886,6 +2993,7 @@
     }
 
     window.addEventListener('beforeprint', () => {
+      if (document.body.classList.contains('printing-certificate')) return;
       const docNum = state.currentRecap?.document_number;
       if (docNum) {
         const cleanTitle = getCleanReportFileName(docNum);
@@ -2897,6 +3005,13 @@
     });
 
     window.addEventListener('afterprint', () => {
+      if (
+        document.documentElement.classList.contains('printing-certificate') ||
+        document.body.classList.contains('printing-certificate')
+      ) {
+        cleanupCertificatePrintMode();
+        return;
+      }
       const modal = document.getElementById('modal-print');
       if (!modal || modal.classList.contains('hidden')) {
         document.title = APP_DEFAULT_TITLE;
@@ -3133,9 +3248,1074 @@
     }
   }
 
+  // =========================================================================
+  // 10. Module 6: Generator & Arsip Sertifikat Training (FEAT-10)
+  // =========================================================================
+  function suggestEnglishDuration(startIso, endIso) {
+    const words = [
+      'one-month', 'two-month', 'three-month', 'four-month',
+      'five-month', 'six-month', 'seven-month', 'eight-month',
+      'nine-month', 'ten-month', 'eleven-month', 'twelve-month',
+    ];
+    if (!startIso || !endIso) return 'three-month';
+    const s = new Date(`${startIso}T00:00:00`);
+    const e = new Date(`${endIso}T00:00:00`);
+    if (isNaN(s.getTime()) || isNaN(e.getTime())) return 'three-month';
+    const days = Math.round((e - s) / 86400000);
+    if (days <= 0) return 'one-month';
+    if (days < 28) {
+      const weeks = Math.max(1, Math.ceil(days / 7));
+      return `${weeks}-week`;
+    }
+    const months = Math.max(1, Math.round(days / 30.4375));
+    return months <= 12 ? words[months - 1] : `${months}-month`;
+  }
+
+  function showCertStatus(message, type = 'info') {
+    const el = document.getElementById('cert-status-live');
+    if (!el) return;
+    if (!message) {
+      el.classList.add('hidden');
+      el.textContent = '';
+      return;
+    }
+    el.className = `cert-status-line ${type}`;
+    el.textContent = message;
+  }
+
+  function getSelectedCertPaperSize() {
+    const checked = document.querySelector('input[name="cert_paper_size"]:checked');
+    return checked?.value === 'A4' ? 'A4' : 'F4';
+  }
+
+  function setSelectedCertPaperSize(paperSize) {
+    const targetVal = String(paperSize || 'F4').toUpperCase() === 'A4' ? 'A4' : 'F4';
+    const radio = document.querySelector(`input[name="cert_paper_size"][value="${targetVal}"]`);
+    if (radio) radio.checked = true;
+    updateCertPaperFrameLabel(targetVal);
+  }
+
+  function updateCertPaperFrameLabel(paperSize) {
+    const isA4 = String(paperSize || 'F4').toUpperCase() === 'A4';
+    const frame = document.getElementById('cert-preview-frame');
+    const label = document.getElementById('cert-paper-dim-label');
+    if (frame) frame.classList.toggle('paper-a4', isA4);
+    if (label) {
+      label.textContent = isA4
+        ? 'Kertas A4 Horizontal (297 x 210 mm)'
+        : 'Kertas F4 Horizontal (330 x 215 mm)';
+    }
+  }
+
+  const CERT_MAX_DIVISIONS = 5;
+
+  function parseDepartmentString(raw) {
+    if (!raw || typeof raw !== 'string') return [{ name: '', duration: '' }];
+    const parts = raw.split(';').map((s) => s.trim()).filter((s) => s && s !== '-');
+    if (parts.length === 0) return [{ name: '', duration: '' }];
+    return parts.map((seg) => {
+      const m = /^(.*?)\s*\(([^()]+)\)\s*$/.exec(seg);
+      if (m && m[1].trim()) {
+        return { name: m[1].trim(), duration: m[2].trim() };
+      }
+      return { name: seg, duration: '' };
+    });
+  }
+
+  function readDivisionRowsFromDom() {
+    const rows = [];
+    document.querySelectorAll('#cert-divisions-list .cert-division-row').forEach((rowEl) => {
+      const name = rowEl.querySelector('.cert-div-name')?.value || '';
+      const duration = rowEl.querySelector('.cert-div-duration')?.value || '';
+      rows.push({ name, duration });
+    });
+    return rows.length ? rows : [{ name: '', duration: '' }];
+  }
+
+  function serializeDivisionRows() {
+    const formatted = [];
+    document.querySelectorAll('#cert-divisions-list .cert-division-row').forEach((rowEl) => {
+      const name = (rowEl.querySelector('.cert-div-name')?.value || '').trim();
+      const duration = (rowEl.querySelector('.cert-div-duration')?.value || '').trim();
+      if (!name) return;
+      formatted.push(duration ? `${name} (${duration})` : name);
+    });
+    return formatted.length ? formatted.join('; ') : null;
+  }
+
+  function renderDivisionRows(items = [{ name: '', duration: '' }]) {
+    const container = document.getElementById('cert-divisions-list');
+    if (!container) return;
+    const list = items.length ? items.slice(0, CERT_MAX_DIVISIONS) : [{ name: '', duration: '' }];
+    container.innerHTML = list.map((item, idx) => `
+      <div class="cert-division-row" data-div-index="${idx}">
+        <input type="text" class="cert-field-control cert-div-name" list="cert-dept-options"
+          value="${escapeHtml(item.name)}"
+          aria-label="Nama divisi ke-${idx + 1}"
+          placeholder="${idx === 0 ? 'Divisi (mis. Housekeeping, Front Office)' : 'Divisi berikutnya (mis. Restaurant Waiter)'}">
+        <input type="text" class="cert-field-control cert-div-duration"
+          value="${escapeHtml(item.duration)}"
+          aria-label="Durasi divisi ke-${idx + 1}"
+          placeholder="Durasi (opsional, mis. 3 months)">
+        <button type="button" class="btn btn-secondary btn-sm cert-division-remove"
+          data-remove-div="${idx}"
+          aria-label="${list.length > 1 ? `Hapus divisi ke-${idx + 1}` : 'Kosongkan divisi'}">${list.length > 1 ? 'Hapus' : 'Bersihkan'}</button>
+      </div>
+    `).join('');
+
+    const addBtn = document.getElementById('btn-cert-add-division');
+    if (addBtn) addBtn.disabled = list.length >= CERT_MAX_DIVISIONS;
+  }
+
+  function syncAchievementPresetSelect() {
+    const input = document.getElementById('cert-achievement');
+    const select = document.getElementById('cert-achievement-preset');
+    if (!input || !select) return;
+    const val = input.value.trim();
+    const matched = Array.from(select.options).some((opt) => opt.value === val);
+    select.value = matched ? val : '';
+  }
+
+  function formatDivisionsDisplay(raw) {
+    if (!raw) return '-';
+    const items = parseDepartmentString(raw).filter((it) => it.name.trim());
+    if (!items.length) return '-';
+    return items.map((it) => (it.duration ? `${it.name} (${it.duration})` : it.name)).join(' & ');
+  }
+
+  function collectCertFormPayload(overrideStatus = null) {
+    const val = (id) => document.getElementById(id)?.value?.trim() || '';
+    const optVal = (id) => {
+      const v = val(id);
+      return v.length > 0 ? v : null;
+    };
+    const def = state.certSettings || {};
+    return {
+      certificate_no: optVal('cert-no'),
+      recipient_name: val('cert-recipient'),
+      duration_text: val('cert-duration'),
+      program_name: optVal('cert-program') || def.program_name || 'hospitality training program',
+      start_date: val('cert-start'),
+      end_date: val('cert-end'),
+      issued_date: val('cert-issued'),
+      department: serializeDivisionRows(),
+      institution: optVal('cert-institution'),
+      achievement_text: optVal('cert-achievement'),
+      notes: optVal('cert-notes'),
+      signer_name: optVal('cert-signer') || def.signer_name || 'Agus Sumardi Wijaya',
+      signer_title: optVal('cert-signer-title') || def.signer_title || 'General Manager',
+      paper_size: getSelectedCertPaperSize(),
+      status: overrideStatus || state.certEditingStatus || 'active',
+    };
+  }
+
+  function validateCertEndDateCustomValidity() {
+    const startEl = document.getElementById('cert-start');
+    const endEl = document.getElementById('cert-end');
+    if (!startEl || !endEl) return;
+    if (startEl.value && endEl.value && endEl.value < startEl.value) {
+      endEl.setCustomValidity('Tanggal selesai tidak boleh lebih awal dari tanggal mulai.');
+    } else {
+      endEl.setCustomValidity('');
+    }
+  }
+
+  function syncCertFieldAria(el, forceFlagInvalid = false) {
+    if (!el || !el.matches?.('input, select, textarea')) return;
+    validateCertEndDateCustomValidity();
+    const isValid = el.validity.valid;
+    const shouldShowError = !isValid && (forceFlagInvalid || el.matches(':user-invalid') || el.classList.contains('user-invalid-fallback'));
+    if (forceFlagInvalid && !isValid) {
+      el.classList.add('user-invalid-fallback');
+    } else if (isValid) {
+      el.classList.remove('user-invalid-fallback');
+    }
+    el.setAttribute('aria-invalid', shouldShowError ? 'true' : 'false');
+    const errorId = el.dataset.error;
+    if (!errorId) return;
+    const ids = (el.getAttribute('aria-describedby') || '')
+      .split(/\s+/)
+      .filter((id) => id && id !== errorId);
+    if (shouldShowError) ids.push(errorId);
+    if (ids.length) {
+      el.setAttribute('aria-describedby', ids.join(' '));
+    } else {
+      el.removeAttribute('aria-describedby');
+    }
+  }
+
+  function clearCertFormAriaErrors() {
+    document.querySelectorAll('#form-certificate .cert-field-control').forEach((el) => {
+      el.setCustomValidity('');
+      el.classList.remove('user-invalid-fallback');
+      el.setAttribute('aria-invalid', 'false');
+      const errorId = el.dataset.error;
+      if (errorId) {
+        const ids = (el.getAttribute('aria-describedby') || '')
+          .split(/\s+/)
+          .filter((id) => id && id !== errorId);
+        if (ids.length) el.setAttribute('aria-describedby', ids.join(' '));
+        else el.removeAttribute('aria-describedby');
+      }
+    });
+  }
+
+  function validateCertificateForm() {
+    validateCertEndDateCustomValidity();
+    const form = document.getElementById('form-certificate');
+    if (!form) return false;
+    let firstInvalid = null;
+    form.querySelectorAll('input[required]').forEach((el) => {
+      const ok = el.checkValidity();
+      syncCertFieldAria(el, !ok);
+      if (!ok && !firstInvalid) firstInvalid = el;
+    });
+    if (firstInvalid) {
+      firstInvalid.focus();
+      showCertStatus('Mohon lengkapi atau perbaiki kolom sertifikat yang ditandai.', 'error');
+      return false;
+    }
+    return true;
+  }
+
+  function scheduleCertPreview(immediate = false) {
+    clearTimeout(state.certPreviewTimer);
+    if (immediate) {
+      refreshCertPreview();
+    } else {
+      state.certPreviewTimer = setTimeout(refreshCertPreview, 120);
+    }
+  }
+
+  async function refreshCertPreview(explicitPayload = null) {
+    const container = document.getElementById('cert-preview-container');
+    if (!container) return;
+    const seq = ++state.certPreviewSeq;
+    const payload = explicitPayload || collectCertFormPayload();
+    updateCertPaperFrameLabel(payload.paper_size);
+    try {
+      const svg = await invoke('preview_certificate_svg', { payload });
+      if (seq !== state.certPreviewSeq) return;
+      container.innerHTML = svg;
+    } catch (err) {
+      if (seq !== state.certPreviewSeq) return;
+      container.innerHTML = `<div class="p-4 text-center text-muted">Gagal memuat pratinjau sertifikat: ${escapeHtml(err)}</div>`;
+    }
+  }
+
+  async function refreshNextCertNoIfAuto() {
+    if (state.certManualNo || state.certEditingId) return;
+    const issuedVal = document.getElementById('cert-issued')?.value;
+    const yearMatch = issuedVal && /^(\d{4})/.exec(issuedVal);
+    const year = yearMatch ? parseInt(yearMatch[1], 10) : new Date().getFullYear();
+    try {
+      const nextNo = await invoke('get_next_certificate_no', { year });
+      const noInput = document.getElementById('cert-no');
+      if (noInput) noInput.value = nextNo;
+    } catch (err) {
+      console.warn('Gagal mengambil nomor sertifikat berikutnya:', err);
+    }
+  }
+
+  function applyCertDefaultsToForm({ keepBatchFields = false } = {}) {
+    const def = state.certSettings || {};
+    const todayIso = getSystemLocalDateStr();
+    const startDefault = getMonthsAgoLocalDateStr(3);
+
+    state.certEditingId = null;
+    state.certEditingStatus = 'active';
+    state.certManualNo = false;
+
+    const editBanner = document.getElementById('cert-edit-banner');
+    if (editBanner) editBanner.classList.add('hidden');
+    const heading = document.getElementById('cert-form-heading');
+    if (heading) heading.textContent = 'Buat Sertifikat Baru';
+    const btnSave = document.getElementById('btn-cert-save');
+    if (btnSave) btnSave.textContent = 'Simpan Sertifikat';
+    const btnSaveNext = document.getElementById('btn-cert-save-next');
+    if (btnSaveNext) btnSaveNext.classList.remove('hidden');
+
+    if (keepBatchFields) {
+      document.getElementById('cert-recipient').value = '';
+      document.getElementById('cert-notes').value = '';
+    } else {
+      state.certManualDuration = false;
+      document.getElementById('cert-recipient').value = '';
+      document.getElementById('cert-start').value = startDefault;
+      document.getElementById('cert-end').value = todayIso;
+      document.getElementById('cert-issued').value = todayIso;
+      document.getElementById('cert-duration').value = suggestEnglishDuration(startDefault, todayIso);
+      document.getElementById('cert-program').value = def.program_name || 'hospitality training program';
+      renderDivisionRows([{ name: '', duration: '' }]);
+      document.getElementById('cert-achievement').value = '';
+      syncAchievementPresetSelect();
+      document.getElementById('cert-institution').value = '';
+      document.getElementById('cert-signer').value = def.signer_name || 'Agus Sumardi Wijaya';
+      document.getElementById('cert-signer-title').value = def.signer_title || 'General Manager';
+      document.getElementById('cert-notes').value = '';
+      setSelectedCertPaperSize(def.paper_size || 'F4');
+    }
+    clearCertFormAriaErrors();
+  }
+
+  function populateCertFormFromRow(row, asEdit = false, { skipPreview = false } = {}) {
+    state.certEditingId = asEdit ? row.id : null;
+    state.certEditingStatus = row.status || 'active';
+    state.certManualNo = true;
+    state.certManualDuration = true;
+
+    document.getElementById('cert-no').value = row.certificate_no || '';
+    document.getElementById('cert-recipient').value = row.recipient_name || '';
+    document.getElementById('cert-start').value = row.start_date || '';
+    document.getElementById('cert-end').value = row.end_date || '';
+    document.getElementById('cert-duration').value = row.duration_text || '';
+    document.getElementById('cert-issued').value = row.issued_date || '';
+    document.getElementById('cert-program').value = row.program_name || 'hospitality training program';
+    renderDivisionRows(parseDepartmentString(row.department));
+    document.getElementById('cert-achievement').value = row.achievement_text || '';
+    syncAchievementPresetSelect();
+    document.getElementById('cert-institution').value = row.institution || '';
+    document.getElementById('cert-signer').value = row.signer_name || '';
+    document.getElementById('cert-signer-title').value = row.signer_title || '';
+    document.getElementById('cert-notes').value = row.notes || '';
+    setSelectedCertPaperSize(row.paper_size || 'F4');
+    clearCertFormAriaErrors();
+
+    const details = document.getElementById('cert-optional-details');
+    if (details && (row.institution || row.notes)) {
+      details.open = true;
+    }
+
+    const editBanner = document.getElementById('cert-edit-banner');
+    const editLabel = document.getElementById('cert-edit-label');
+    const heading = document.getElementById('cert-form-heading');
+    const btnSave = document.getElementById('btn-cert-save');
+    const btnSaveNext = document.getElementById('btn-cert-save-next');
+
+    if (asEdit) {
+      if (editBanner) editBanner.classList.remove('hidden');
+      if (editLabel) editLabel.textContent = `Mode Edit: ${row.certificate_no} (${row.recipient_name})`;
+      if (heading) heading.textContent = 'Edit Data Sertifikat';
+      if (btnSave) btnSave.textContent = 'Simpan Perubahan';
+      if (btnSaveNext) btnSaveNext.classList.add('hidden');
+      document.getElementById('cert-recipient')?.focus();
+    } else {
+      if (editBanner) editBanner.classList.add('hidden');
+      if (heading) heading.textContent = 'Buat Sertifikat Baru';
+      if (btnSave) btnSave.textContent = 'Simpan Sertifikat';
+      if (btnSaveNext) btnSaveNext.classList.remove('hidden');
+    }
+
+    if (!skipPreview) {
+      refreshCertPreview();
+    }
+  }
+
+  async function submitCertificateForm({ andNext = false } = {}) {
+    if (!validateCertificateForm()) return;
+
+    const btnPrimary = document.getElementById('btn-cert-save');
+    const btnNext = document.getElementById('btn-cert-save-next');
+    if (btnPrimary) btnPrimary.disabled = true;
+    if (btnNext) btnNext.disabled = true;
+
+    try {
+      const payload = collectCertFormPayload();
+      let saved;
+      if (state.certEditingId) {
+        saved = await invoke('update_certificate', { id: state.certEditingId, payload });
+        state.certEditingId = null;
+        state.certEditingStatus = saved.status || 'active';
+        populateCertFormFromRow(saved, false, { skipPreview: true });
+        showCertStatus(`Perubahan sertifikat ${saved.certificate_no} (${saved.recipient_name}) berhasil disimpan.`, 'success');
+      } else {
+        saved = await invoke('create_certificate', { payload });
+        if (andNext) {
+          applyCertDefaultsToForm({ keepBatchFields: true });
+          await refreshNextCertNoIfAuto();
+          showCertStatus(`Sertifikat ${saved.certificate_no} (${saved.recipient_name}) tersimpan. Silakan isi peserta berikutnya.`, 'success');
+          document.getElementById('cert-recipient')?.focus();
+        } else if (isAdminUser()) {
+          populateCertFormFromRow(saved, true, { skipPreview: true });
+          showCertStatus(`Sertifikat ${saved.certificate_no} (${saved.recipient_name}) tersimpan. Anda dapat langsung mengekspor/mencetak atau menyuntingnya.`, 'success');
+        } else {
+          state.certEditingStatus = saved.status || 'active';
+          showCertStatus(`Sertifikat ${saved.certificate_no} (${saved.recipient_name}) tersimpan. Silakan ekspor/cetak atau klik Baru / Reset untuk peserta berikutnya.`, 'success');
+        }
+      }
+
+      await Promise.all([refreshCertificateYears(), loadCertificatesHistory()]);
+      await refreshCertPreview();
+    } catch (err) {
+      showCertStatus(String(err), 'error');
+    } finally {
+      if (btnPrimary) btnPrimary.disabled = false;
+      if (btnNext) btnNext.disabled = false;
+    }
+  }
+
+  async function refreshCertificateYears() {
+    const yearSelect = document.getElementById('cert-filter-year');
+    if (!yearSelect) return;
+    try {
+      const years = await invoke('get_certificate_years');
+      const prev = state.certYear || 'all';
+      yearSelect.innerHTML = '<option value="all">Semua Tahun</option>';
+      (years || []).forEach((y) => {
+        const opt = document.createElement('option');
+        opt.value = y;
+        opt.textContent = y;
+        if (y === prev) opt.selected = true;
+        yearSelect.appendChild(opt);
+      });
+      if (prev !== 'all' && !(years || []).includes(prev)) {
+        state.certYear = 'all';
+        yearSelect.value = 'all';
+      }
+    } catch (err) {
+      console.warn('Gagal memuat daftar tahun sertifikat:', err);
+    }
+  }
+
+  function renderCertificateHistoryRows() {
+    const tbody = document.getElementById('cert-history-body');
+    if (!tbody) return;
+
+    const rows = state.certRows || [];
+    if (rows.length === 0) {
+      const hasFilters = Boolean(state.certSearch) || state.certYear !== 'all' || state.certStatus !== 'all';
+      tbody.innerHTML = hasFilters
+        ? '<tr><td colspan="8" class="text-center text-muted">Tidak ada sertifikat yang cocok dengan filter pencarian. Ubah kata kunci atau reset filter.</td></tr>'
+        : '<tr><td colspan="8" class="text-center text-muted">Belum ada sertifikat tersimpan. Isi formulir di kiri lalu klik Simpan Sertifikat untuk menerbitkan sertifikat pertama.</td></tr>';
+      return;
+    }
+
+    const adminMode = isAdminUser();
+    tbody.innerHTML = rows.map((row) => {
+      const isRevoked = row.status === 'revoked';
+      const statusPill = isRevoked
+        ? '<span class="cert-status-pill is-revoked">Dibatalkan</span>'
+        : '<span class="cert-status-pill is-active">Aktif</span>';
+      const deptLabel = row.department ? formatDivisionsDisplay(row.department) : '';
+      const deptInst = [deptLabel, row.institution].filter(Boolean).join(' / ') || '-';
+      const achSubtitle = row.achievement_text
+        ? `<div class="text-muted" style="font-size:11px;">${escapeHtml(row.achievement_text)}</div>`
+        : '';
+      const adminButtons = adminMode
+        ? `
+          <button type="button" class="btn btn-secondary btn-sm cert-row-btn" data-cert-action="edit" data-cert-id="${row.id}">Edit</button>
+          <button type="button" class="btn btn-secondary btn-sm cert-row-btn" data-cert-action="toggle-status" data-cert-id="${row.id}">${isRevoked ? 'Aktifkan' : 'Batalkan'}</button>
+          <button type="button" class="btn btn-danger btn-sm cert-row-btn" data-cert-action="delete" data-cert-id="${row.id}">Hapus</button>
+        `
+        : '';
+
+      return `
+        <tr>
+          <td data-label="Nomor" class="font-mono"><strong>${escapeHtml(row.certificate_no)}</strong></td>
+          <td data-label="Nama Penerima"><strong>${escapeHtml(row.recipient_name)}</strong>${achSubtitle}</td>
+          <td data-label="Durasi &amp; Periode">${escapeHtml(row.duration_text)}<div class="text-muted" style="font-size:11px;">${escapeHtml(row.start_date)} s/d ${escapeHtml(row.end_date)}</div></td>
+          <td data-label="Tgl Terbit" class="font-mono">${escapeHtml(row.issued_date)}</td>
+          <td data-label="Departemen / Kampus">${escapeHtml(deptInst)}</td>
+          <td data-label="Kertas">${escapeHtml(row.paper_size)}</td>
+          <td data-label="Status">${statusPill}</td>
+          <td data-label="Aksi">
+            <div class="cert-row-actions">
+              <button type="button" class="btn btn-secondary btn-sm cert-row-btn" data-cert-action="preview" data-cert-id="${row.id}">Pratinjau</button>
+              <button type="button" class="btn btn-secondary btn-sm cert-row-btn" data-cert-action="pdf" data-cert-id="${row.id}">PDF</button>
+              <button type="button" class="btn btn-secondary btn-sm cert-row-btn" data-cert-action="png" data-cert-id="${row.id}">PNG</button>
+              <button type="button" class="btn btn-secondary btn-sm cert-row-btn" data-cert-action="print" data-cert-id="${row.id}">Cetak</button>
+              ${adminButtons}
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  async function loadCertificatesHistory() {
+    const tbody = document.getElementById('cert-history-body');
+    const summaryCounts = document.getElementById('cert-summary-counts');
+    const metaEl = document.getElementById('cert-history-meta');
+    const pageInfo = document.getElementById('cert-page-info');
+    const btnPrev = document.getElementById('btn-cert-prev');
+    const btnNext = document.getElementById('btn-cert-next');
+
+    if (tbody && !state.certRows.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">Memuat riwayat sertifikat dari database...</td></tr>';
+    }
+
+    try {
+      const res = await invoke('get_certificates', {
+        year: state.certYear,
+        status: state.certStatus,
+        search: state.certSearch,
+        page: state.certPage,
+        pageSize: state.certPageSize,
+      });
+
+      state.certRows = res.items || [];
+      state.certPage = res.page || 1;
+      state.certTotalPages = res.total_pages || 1;
+
+      renderCertificateHistoryRows();
+
+      if (summaryCounts) {
+        summaryCounts.textContent = `${res.total_count} Tersimpan (${res.active_count} Aktif, ${res.revoked_count} Dibatalkan)`;
+      }
+      if (metaEl) {
+        metaEl.textContent = `Menampilkan ${state.certRows.length} dari ${res.total_count} data sertifikat`;
+      }
+      if (pageInfo) {
+        pageInfo.textContent = `Halaman ${res.page} dari ${res.total_pages} (${res.total_count} data)`;
+      }
+      if (btnPrev) btnPrev.disabled = res.page <= 1;
+      if (btnNext) btnNext.disabled = res.page >= res.total_pages;
+    } catch (err) {
+      if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-warning">Gagal memuat riwayat sertifikat: ${escapeHtml(err)}. Tekan Cari untuk mencoba lagi.</td></tr>`;
+      }
+      showCertStatus(`Gagal memuat riwayat sertifikat: ${err}`, 'error');
+    }
+  }
+
+  function rowToCertificateRenderPayload(row) {
+    return {
+      certificate_no: row.certificate_no,
+      recipient_name: row.recipient_name,
+      duration_text: row.duration_text,
+      program_name: row.program_name,
+      start_date: row.start_date,
+      end_date: row.end_date,
+      issued_date: row.issued_date,
+      department: row.department,
+      achievement_text: row.achievement_text,
+      signer_name: row.signer_name,
+      signer_title: row.signer_title,
+      paper_size: row.paper_size,
+      status: row.status,
+    };
+  }
+
+  async function exportCertificateFormat(format, row = null) {
+    const payload = row
+      ? rowToCertificateRenderPayload(row)
+      : collectCertFormPayload();
+
+    const cmd = format === 'png' ? 'export_certificate_png' : 'export_certificate_pdf';
+    try {
+      const msg = await invoke(cmd, { payload });
+      if (msg && !String(msg).toLowerCase().includes('dibatalkan')) {
+        showCertStatus(msg, 'success');
+      } else if (msg) {
+        showCertStatus(msg, 'info');
+      }
+    } catch (err) {
+      showCertStatus(`Gagal mengekspor sertifikat: ${err}`, 'error');
+    }
+  }
+
+  let certPrintFallbackCleanup = null;
+
+  function cleanupCertificatePrintMode() {
+    const dynStyle = document.getElementById('cert-dynamic-page-style');
+    const isActive =
+      document.documentElement.classList.contains('printing-certificate') ||
+      document.body.classList.contains('printing-certificate') ||
+      Boolean(dynStyle) ||
+      Boolean(certPrintFallbackCleanup);
+    if (!isActive) return;
+
+    if (certPrintFallbackCleanup) {
+      const dispose = certPrintFallbackCleanup;
+      certPrintFallbackCleanup = null;
+      dispose();
+    }
+
+    document.documentElement.classList.remove('printing-certificate');
+    document.body.classList.remove('printing-certificate');
+    if (dynStyle) dynStyle.remove();
+    const stage = document.getElementById('cert-print-stage');
+    if (stage) stage.innerHTML = '';
+    document.title = APP_DEFAULT_TITLE;
+    if (isTauri) {
+      invoke('set_window_title', { title: APP_DEFAULT_TITLE }).catch(() => {});
+    }
+  }
+
+  function resetCertificatesSessionState() {
+    clearTimeout(state.certPreviewTimer);
+    state.certPreviewSeq += 1;
+    state.certInitialized = false;
+    state.certEditingId = null;
+    state.certEditingStatus = 'active';
+    state.certManualNo = false;
+    state.certManualDuration = false;
+    state.certSettings = null;
+    state.certRows = [];
+    state.certPage = 1;
+    state.certTotalPages = 1;
+    state.certYear = 'all';
+    state.certStatus = 'all';
+    state.certSearch = '';
+
+    cleanupCertificatePrintMode();
+
+    const settingsDialog = document.getElementById('dialog-cert-settings');
+    if (settingsDialog?.open) settingsDialog.close();
+
+    if (document.getElementById('form-certificate')) {
+      applyCertDefaultsToForm({ keepBatchFields: false });
+      const noInput = document.getElementById('cert-no');
+      if (noInput) noInput.value = '';
+    }
+    const previewContainer = document.getElementById('cert-preview-container');
+    if (previewContainer) previewContainer.innerHTML = '';
+    const historyBody = document.getElementById('cert-history-body');
+    if (historyBody) historyBody.innerHTML = '';
+    const summaryCounts = document.getElementById('cert-summary-counts');
+    if (summaryCounts) summaryCounts.textContent = '0 Tersimpan';
+    const filterSearch = document.getElementById('cert-filter-search');
+    if (filterSearch) filterSearch.value = '';
+    const filterYear = document.getElementById('cert-filter-year');
+    if (filterYear) filterYear.innerHTML = '<option value="all">Semua Tahun</option>';
+    const filterStatus = document.getElementById('cert-filter-status');
+    if (filterStatus) filterStatus.value = 'all';
+    showCertStatus('');
+  }
+
+  async function printCertificateDocument(row = null) {
+    const payload = row
+      ? rowToCertificateRenderPayload(row)
+      : collectCertFormPayload();
+
+    try {
+      const svg = await invoke('preview_certificate_svg', { payload });
+      const stage = document.getElementById('cert-print-stage');
+      if (!stage) return;
+      stage.innerHTML = svg;
+
+      const existingStyle = document.getElementById('cert-dynamic-page-style');
+      if (existingStyle) existingStyle.remove();
+      const pageStyle = document.createElement('style');
+      pageStyle.id = 'cert-dynamic-page-style';
+      const isA4 = String(payload.paper_size || 'F4').toUpperCase() === 'A4';
+      pageStyle.textContent = isA4
+        ? '@media print { @page { size: 297mm 210mm; margin: 0; } }'
+        : '@media print { @page { size: 330mm 215mm; margin: 0; } }';
+      document.head.appendChild(pageStyle);
+
+      document.documentElement.classList.add('printing-certificate');
+      document.body.classList.add('printing-certificate');
+      const cleanName = `Certificate_${getCleanReportFileName(payload.certificate_no)}_${getCleanReportFileName(payload.recipient_name)}`;
+      document.title = cleanName;
+
+      if (certPrintFallbackCleanup) {
+        certPrintFallbackCleanup();
+        certPrintFallbackCleanup = null;
+      }
+      const mql = window.matchMedia ? window.matchMedia('print') : null;
+      const onMediaChange = (e) => {
+        if (!e.matches) cleanupCertificatePrintMode();
+      };
+      const onWindowFocus = () => {
+        cleanupCertificatePrintMode();
+      };
+      let focusTimer = null;
+      if (mql?.addEventListener) {
+        mql.addEventListener('change', onMediaChange);
+      }
+      certPrintFallbackCleanup = () => {
+        if (focusTimer) {
+          clearTimeout(focusTimer);
+          focusTimer = null;
+        }
+        window.removeEventListener('focus', onWindowFocus);
+        if (mql?.removeEventListener) {
+          mql.removeEventListener('change', onMediaChange);
+        }
+      };
+
+      if (isTauri) {
+        await invoke('print_certificate', { title: cleanName });
+      } else {
+        window.print();
+      }
+
+      if (certPrintFallbackCleanup) {
+        focusTimer = setTimeout(() => {
+          if (document.body.classList.contains('printing-certificate')) {
+            window.addEventListener('focus', onWindowFocus, { once: true });
+          }
+        }, 300);
+      }
+    } catch (err) {
+      cleanupCertificatePrintMode();
+      showCertStatus(`Gagal mencetak sertifikat: ${err}`, 'error');
+    }
+  }
+
+  function applyCertSettingsToDialog(cfg) {
+    state.certSettings = cfg;
+    document.getElementById('cfg-cert-signer').value = cfg.signer_name || 'Agus Sumardi Wijaya';
+    document.getElementById('cfg-cert-title').value = cfg.signer_title || 'General Manager';
+    document.getElementById('cfg-cert-program').value = cfg.program_name || 'hospitality training program';
+    document.getElementById('cfg-cert-paper').value = cfg.paper_size === 'A4' ? 'A4' : 'F4';
+    document.getElementById('cfg-cert-show-sig').checked = Boolean(cfg.show_signature);
+
+    const logoPreview = document.getElementById('cfg-cert-logo-preview');
+    if (logoPreview && cfg.logo_data_uri) logoPreview.src = cfg.logo_data_uri;
+
+    const sigPreview = document.getElementById('cfg-cert-sig-preview');
+    const sigEmpty = document.getElementById('cfg-cert-sig-empty');
+    if (cfg.signature_data_uri) {
+      if (sigPreview) {
+        sigPreview.src = cfg.signature_data_uri;
+        sigPreview.classList.remove('hidden');
+      }
+      if (sigEmpty) sigEmpty.classList.add('hidden');
+    } else {
+      if (sigPreview) {
+        sigPreview.removeAttribute('src');
+        sigPreview.classList.add('hidden');
+      }
+      if (sigEmpty) sigEmpty.classList.remove('hidden');
+    }
+  }
+
+  async function loadCertificatesModuleView() {
+    if (!state.certInitialized) {
+      try {
+        state.certSettings = await invoke('get_certificate_settings');
+      } catch (err) {
+        console.warn('Gagal memuat pengaturan sertifikat:', err);
+      }
+      applyCertDefaultsToForm({ keepBatchFields: false });
+      await refreshNextCertNoIfAuto();
+      state.certInitialized = true;
+    }
+    await Promise.all([refreshCertificateYears(), loadCertificatesHistory(), refreshCertPreview()]);
+  }
+
+  function initCertificatesModule() {
+    const form = document.getElementById('form-certificate');
+    if (!form) return;
+
+    const startInput = document.getElementById('cert-start');
+    const endInput = document.getElementById('cert-end');
+    const durationInput = document.getElementById('cert-duration');
+    const issuedInput = document.getElementById('cert-issued');
+    const noInput = document.getElementById('cert-no');
+
+    // Sync initial aria-invalid attributes
+    form.querySelectorAll('.cert-field-control').forEach((el) => {
+      if (!el.hasAttribute('aria-invalid')) el.setAttribute('aria-invalid', 'false');
+    });
+
+    noInput?.addEventListener('input', () => {
+      state.certManualNo = Boolean(noInput.value.trim());
+    });
+    durationInput?.addEventListener('input', () => {
+      state.certManualDuration = Boolean(durationInput.value.trim());
+    });
+
+    const onDateRangeChanged = () => {
+      validateCertEndDateCustomValidity();
+      if (!state.certManualDuration && !state.certEditingId && startInput?.value && endInput?.value) {
+        durationInput.value = suggestEnglishDuration(startInput.value, endInput.value);
+        syncCertFieldAria(durationInput, false);
+      }
+    };
+    startInput?.addEventListener('change', onDateRangeChanged);
+    endInput?.addEventListener('change', onDateRangeChanged);
+
+    issuedInput?.addEventListener('change', async () => {
+      await refreshNextCertNoIfAuto();
+      scheduleCertPreview(true);
+    });
+
+    form.addEventListener('input', (e) => {
+      if (!state.certEditingId && state.certEditingStatus !== 'active') {
+        state.certEditingStatus = 'active';
+      }
+      if (e.target.hasAttribute?.('aria-invalid')) syncCertFieldAria(e.target, false);
+      scheduleCertPreview(false);
+    });
+
+    form.addEventListener('change', (e) => {
+      if (!state.certEditingId && state.certEditingStatus !== 'active') {
+        state.certEditingStatus = 'active';
+      }
+      syncCertFieldAria(e.target, false);
+      scheduleCertPreview(true);
+    });
+
+    form.addEventListener('blur', (e) => {
+      syncCertFieldAria(e.target, false);
+    }, true);
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await submitCertificateForm({ andNext: false });
+    });
+
+    document.getElementById('btn-cert-add-division')?.addEventListener('click', () => {
+      const rows = readDivisionRowsFromDom();
+      if (rows.length >= CERT_MAX_DIVISIONS) return;
+      rows.push({ name: '', duration: '' });
+      renderDivisionRows(rows);
+      const inputs = document.querySelectorAll('#cert-divisions-list .cert-div-name');
+      inputs[inputs.length - 1]?.focus();
+      scheduleCertPreview(false);
+    });
+
+    document.getElementById('cert-divisions-list')?.addEventListener('click', (e) => {
+      const removeBtn = e.target.closest('[data-remove-div]');
+      if (!removeBtn) return;
+      const idx = Number(removeBtn.dataset.removeDiv);
+      const rows = readDivisionRowsFromDom();
+      if (rows.length <= 1) {
+        renderDivisionRows([{ name: '', duration: '' }]);
+      } else {
+        rows.splice(idx, 1);
+        renderDivisionRows(rows);
+      }
+      scheduleCertPreview(true);
+    });
+
+    document.getElementById('cert-achievement-preset')?.addEventListener('change', (e) => {
+      const achInput = document.getElementById('cert-achievement');
+      if (achInput) achInput.value = e.target.value;
+      scheduleCertPreview(true);
+    });
+
+    document.getElementById('cert-achievement')?.addEventListener('input', () => {
+      syncAchievementPresetSelect();
+    });
+
+    document.getElementById('btn-cert-save-next')?.addEventListener('click', async () => {
+      await submitCertificateForm({ andNext: true });
+    });
+
+    document.getElementById('btn-cert-auto-no')?.addEventListener('click', async () => {
+      state.certManualNo = false;
+      const issuedVal = issuedInput?.value;
+      const m = issuedVal && /^(\d{4})/.exec(issuedVal);
+      const y = m ? parseInt(m[1], 10) : new Date().getFullYear();
+      try {
+        noInput.value = await invoke('get_next_certificate_no', { year: y });
+        syncCertFieldAria(noInput, false);
+        scheduleCertPreview(true);
+      } catch (err) {
+        showCertStatus(String(err), 'error');
+      }
+    });
+
+    const resetToNew = async () => {
+      applyCertDefaultsToForm({ keepBatchFields: false });
+      await refreshNextCertNoIfAuto();
+      showCertStatus('');
+      scheduleCertPreview(true);
+      document.getElementById('cert-recipient')?.focus();
+    };
+    document.getElementById('btn-cert-reset')?.addEventListener('click', resetToNew);
+    document.getElementById('btn-cert-cancel-edit')?.addEventListener('click', resetToNew);
+
+    document.getElementById('btn-cert-export-pdf')?.addEventListener('click', () => exportCertificateFormat('pdf'));
+    document.getElementById('btn-cert-export-png')?.addEventListener('click', () => exportCertificateFormat('png'));
+    document.getElementById('btn-cert-print')?.addEventListener('click', () => printCertificateDocument());
+
+    // History Filters & Pagination
+    const filterForm = document.getElementById('form-cert-filter');
+    filterForm?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      state.certSearch = document.getElementById('cert-filter-search')?.value?.trim() || '';
+      state.certYear = document.getElementById('cert-filter-year')?.value || 'all';
+      state.certStatus = document.getElementById('cert-filter-status')?.value || 'all';
+      state.certPage = 1;
+      loadCertificatesHistory();
+    });
+
+    document.getElementById('cert-filter-year')?.addEventListener('change', () => {
+      state.certYear = document.getElementById('cert-filter-year').value;
+      state.certPage = 1;
+      loadCertificatesHistory();
+    });
+    document.getElementById('cert-filter-status')?.addEventListener('change', () => {
+      state.certStatus = document.getElementById('cert-filter-status').value;
+      state.certPage = 1;
+      loadCertificatesHistory();
+    });
+    document.getElementById('cert-page-size')?.addEventListener('change', () => {
+      state.certPageSize = Number(document.getElementById('cert-page-size').value) || 25;
+      state.certPage = 1;
+      loadCertificatesHistory();
+    });
+    document.getElementById('btn-cert-prev')?.addEventListener('click', () => {
+      if (state.certPage > 1) {
+        state.certPage--;
+        loadCertificatesHistory();
+      }
+    });
+    document.getElementById('btn-cert-next')?.addEventListener('click', () => {
+      if (state.certPage < state.certTotalPages) {
+        state.certPage++;
+        loadCertificatesHistory();
+      }
+    });
+
+    // Row actions delegation
+    document.getElementById('cert-history-body')?.addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-cert-action]');
+      if (!btn) return;
+      const action = btn.dataset.certAction;
+      const id = Number(btn.dataset.certId);
+      const row = state.certRows.find((r) => r.id === id);
+      if (!row) return;
+
+      if (action === 'preview') {
+        populateCertFormFromRow(row, false);
+        showCertStatus(`Menampilkan pratinjau ${row.certificate_no} (${row.recipient_name}).`, 'info');
+      } else if (action === 'pdf') {
+        await exportCertificateFormat('pdf', row);
+      } else if (action === 'png') {
+        await exportCertificateFormat('png', row);
+      } else if (action === 'print') {
+        await printCertificateDocument(row);
+      } else if (action === 'edit') {
+        populateCertFormFromRow(row, true);
+      } else if (action === 'toggle-status') {
+        const nextStatus = row.status === 'revoked' ? 'active' : 'revoked';
+        const prompt = nextStatus === 'revoked'
+          ? `Batalkan sertifikat ${row.certificate_no} atas nama ${row.recipient_name}? Sertifikat yang dibatalkan akan diberi tanda REVOKED.`
+          : `Aktifkan kembali sertifikat ${row.certificate_no} atas nama ${row.recipient_name}?`;
+        if (!(await appConfirm(prompt, 'Konfirmasi Status Sertifikat'))) return;
+        try {
+          const updated = await invoke('set_certificate_status', { id: row.id, status: nextStatus });
+          await loadCertificatesHistory();
+          if (document.getElementById('cert-no')?.value?.trim() === row.certificate_no) {
+            state.certEditingStatus = updated.status;
+            await refreshCertPreview();
+          }
+          showCertStatus(`Status sertifikat ${row.certificate_no} diubah menjadi ${nextStatus === 'revoked' ? 'Dibatalkan' : 'Aktif'}.`, 'success');
+        } catch (err) {
+          showCertStatus(String(err), 'error');
+        }
+      } else if (action === 'delete') {
+        const ok = await appConfirm(
+          `Hapus permanen data sertifikat ${row.certificate_no} (${row.recipient_name}) dari database?`,
+          'Konfirmasi Hapus Sertifikat',
+          'error',
+          'Hapus',
+          'Batal'
+        );
+        if (!ok) return;
+        try {
+          await invoke('delete_certificate', { id: row.id });
+          if (state.certEditingId === row.id) {
+            applyCertDefaultsToForm({ keepBatchFields: false });
+            await refreshNextCertNoIfAuto();
+          }
+          await Promise.all([refreshCertificateYears(), loadCertificatesHistory(), refreshCertPreview()]);
+          showCertStatus(`Sertifikat ${row.certificate_no} dihapus dari database.`, 'success');
+        } catch (err) {
+          showCertStatus(String(err), 'error');
+        }
+      }
+    });
+
+    // Admin Settings <dialog>
+    const settingsDialog = document.getElementById('dialog-cert-settings');
+    const settingsForm = document.getElementById('form-cert-settings');
+
+    document.getElementById('btn-cert-settings')?.addEventListener('click', async () => {
+      try {
+        const cfg = await invoke('get_certificate_settings');
+        applyCertSettingsToDialog(cfg);
+        settingsDialog?.showModal();
+      } catch (err) {
+        showCertStatus(`Gagal membuka pengaturan sertifikat: ${err}`, 'error');
+      }
+    });
+
+    document.getElementById('btn-close-cert-settings')?.addEventListener('click', () => settingsDialog?.close());
+    document.getElementById('btn-cancel-cert-settings')?.addEventListener('click', () => settingsDialog?.close());
+
+    document.getElementById('btn-cfg-upload-logo')?.addEventListener('click', async () => {
+      try {
+        const cfg = await invoke('upload_certificate_asset', { kind: 'logo' });
+        if (!cfg) return;
+        applyCertSettingsToDialog(cfg);
+        await refreshCertPreview();
+        showCertStatus('Logo sertifikat kustom diperbarui.', 'success');
+      } catch (err) {
+        alert(String(err));
+      }
+    });
+
+    document.getElementById('btn-cfg-reset-logo')?.addEventListener('click', async () => {
+      try {
+        const cfg = await invoke('clear_certificate_asset', { kind: 'logo' });
+        applyCertSettingsToDialog(cfg);
+        await refreshCertPreview();
+        showCertStatus('Logo sertifikat dikembalikan ke logo bawaan Anda Bungalows.', 'success');
+      } catch (err) {
+        alert(String(err));
+      }
+    });
+
+    document.getElementById('btn-cfg-upload-sig')?.addEventListener('click', async () => {
+      try {
+        const cfg = await invoke('upload_certificate_asset', { kind: 'signature' });
+        if (!cfg) return;
+        applyCertSettingsToDialog(cfg);
+        await refreshCertPreview();
+        showCertStatus('Gambar tanda tangan/stempel diperbarui.', 'success');
+      } catch (err) {
+        alert(String(err));
+      }
+    });
+
+    document.getElementById('btn-cfg-clear-sig')?.addEventListener('click', async () => {
+      try {
+        const cfg = await invoke('clear_certificate_asset', { kind: 'signature' });
+        applyCertSettingsToDialog(cfg);
+        await refreshCertPreview();
+        showCertStatus('Gambar tanda tangan dihapus (mode tanda tangan basah).', 'info');
+      } catch (err) {
+        alert(String(err));
+      }
+    });
+
+    settingsForm?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        const cfg = await invoke('update_certificate_settings', {
+          signerName: document.getElementById('cfg-cert-signer').value.trim(),
+          signerTitle: document.getElementById('cfg-cert-title').value.trim(),
+          programName: document.getElementById('cfg-cert-program').value.trim(),
+          paperSize: document.getElementById('cfg-cert-paper').value,
+          showSignature: document.getElementById('cfg-cert-show-sig').checked,
+        });
+        applyCertSettingsToDialog(cfg);
+        if (!state.certEditingId) {
+          document.getElementById('cert-signer').value = cfg.signer_name;
+          document.getElementById('cert-signer-title').value = cfg.signer_title;
+          document.getElementById('cert-program').value = cfg.program_name;
+          setSelectedCertPaperSize(cfg.paper_size);
+        }
+        settingsDialog?.close();
+        await refreshCertPreview();
+        showCertStatus('Pengaturan default sertifikat disimpan.', 'success');
+      } catch (err) {
+        alert(String(err));
+      }
+    });
+  }
+
   // DOM Content Loaded Entrypoint
   document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('form').forEach(form => {
+      if (form.id === 'form-certificate' || form.id === 'form-cert-filter' || form.id === 'form-cert-settings') return;
       form.addEventListener('submit', (e) => e.preventDefault());
     });
     initAuth();
@@ -3146,6 +4326,7 @@
     initImportsModule();
     initOptimizerModule();
     initTourismModule();
+    initCertificatesModule();
     initSettingsModal();
     initModalsDismiss();
   });

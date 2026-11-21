@@ -192,6 +192,16 @@
             </button>
           </div>
         </div>
+
+        <!-- 4. Menu Langsung: Sertifikat Training -->
+        <button type="button" id="nav-tab-certificates" class="nav-direct-btn" data-action="view-tab" data-tab="certificates">
+          <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="14" rx="2" />
+            <circle cx="12" cy="11" r="3" />
+            <path d="M10 14l-1.5 6 3.5-2 3.5 2-1.5-6" />
+          </svg>
+          <span>Sertifikat Training</span>
+        </button>
       </nav>
 
       <!-- Right Header Actions -->
@@ -972,6 +982,303 @@
         </div>
       </section>
 
+      <!-- =================================================================== -->
+      <!-- TAB 6: SERTIFIKAT TRAINING (ANDA BUNGALOWS & RESTAURANT)            -->
+      <!-- =================================================================== -->
+      <section id="view-certificates" class="module-view">
+        <div class="cert-scope-bar">
+          <div class="cert-scope-meta">
+            <h1 class="cert-page-heading">Generator &amp; Arsip Sertifikat Training</h1>
+            <span class="cert-property-note">Properti: ANDA BUNGALOWS &amp; RESTAURANT</span>
+            <span id="cert-summary-counts" class="card-subtitle">0 Tersimpan</span>
+          </div>
+          <div class="header-actions">
+            <button type="button" id="btn-cert-settings" class="btn btn-secondary hidden">
+              Pengaturan Logo &amp; TTD
+            </button>
+          </div>
+        </div>
+
+        <div class="cert-workspace-grid">
+          <!-- Left: Form Input Sertifikat -->
+          <section class="card cert-form-card">
+            <div class="card-header">
+              <h2 id="cert-form-heading" class="card-title">Buat Sertifikat Baru</h2>
+              <button type="button" id="btn-cert-reset" class="btn btn-secondary btn-sm">Baru / Reset</button>
+            </div>
+
+            <div id="cert-edit-banner" class="cert-edit-banner hidden">
+              <span id="cert-edit-label">Mode Edit Sertifikat</span>
+              <button type="button" id="btn-cert-cancel-edit" class="btn btn-secondary btn-sm">Batal Edit</button>
+            </div>
+
+            <form id="form-certificate" aria-labelledby="cert-form-heading" novalidate>
+              <div class="cert-form-grid">
+                <div class="cert-field-group is-full">
+                  <label for="cert-no" class="cert-field-label">
+                    Nomor Sertifikat <span class="cert-required-mark" aria-hidden="true">*</span>
+                  </label>
+                  <span id="cert-no-hint" class="cert-field-hint">Format standar: 001/ABR/YYYY (otomatis berurutan per tahun)</span>
+                  <div class="cert-inline-input">
+                    <input type="text" id="cert-no" name="certificate_no" class="cert-field-control font-mono"
+                      autocorrect="off" autocapitalize="none" spellcheck="false"
+                      aria-describedby="cert-no-hint" data-error="cert-no-error" required
+                      placeholder="001/ABR/2026">
+                    <button type="button" id="btn-cert-auto-no" class="btn btn-secondary btn-sm">Otomatis</button>
+                  </div>
+                  <div id="cert-no-error" class="cert-field-error">Error: Nomor sertifikat wajib diisi.</div>
+                </div>
+
+                <div class="cert-field-group is-full">
+                  <label for="cert-recipient" class="cert-field-label">
+                    Nama Penerima <span class="cert-required-mark" aria-hidden="true">*</span>
+                  </label>
+                  <input type="text" id="cert-recipient" name="recipient_name" class="cert-field-control"
+                    autocomplete="name" data-error="cert-recipient-error" required
+                    placeholder="Nama Lengkap Peserta">
+                  <div id="cert-recipient-error" class="cert-field-error">Error: Nama penerima sertifikat wajib diisi.</div>
+                </div>
+
+                <div class="cert-field-group">
+                  <label for="cert-start" class="cert-field-label">
+                    Tanggal Mulai <span class="cert-required-mark" aria-hidden="true">*</span>
+                  </label>
+                  <input type="date" id="cert-start" name="start_date" class="cert-field-control"
+                    data-error="cert-start-error" required>
+                  <div id="cert-start-error" class="cert-field-error">Error: Tanggal mulai pelatihan wajib diisi.</div>
+                </div>
+
+                <div class="cert-field-group">
+                  <label for="cert-end" class="cert-field-label">
+                    Tanggal Selesai <span class="cert-required-mark" aria-hidden="true">*</span>
+                  </label>
+                  <input type="date" id="cert-end" name="end_date" class="cert-field-control"
+                    data-error="cert-end-error" required>
+                  <div id="cert-end-error" class="cert-field-error">Error: Tanggal selesai harus valid dan tidak mendahului tanggal mulai.</div>
+                </div>
+
+                <div class="cert-field-group">
+                  <label for="cert-duration" class="cert-field-label">
+                    Durasi (Inggris) <span class="cert-required-mark" aria-hidden="true">*</span>
+                  </label>
+                  <span id="cert-duration-hint" class="cert-field-hint">Otomatis disarankan dari rentang tanggal</span>
+                  <input type="text" id="cert-duration" name="duration_text" class="cert-field-control"
+                    aria-describedby="cert-duration-hint" data-error="cert-duration-error" required
+                    placeholder="three-month">
+                  <div id="cert-duration-error" class="cert-field-error">Error: Durasi pelatihan (mis. three-month) wajib diisi.</div>
+                </div>
+
+                <div class="cert-field-group">
+                  <label for="cert-issued" class="cert-field-label">
+                    Tanggal Terbit <span class="cert-required-mark" aria-hidden="true">*</span>
+                  </label>
+                  <span id="cert-issued-hint" class="cert-field-hint">Jika sama dengan Tanggal Selesai, baris "Awarded on" otomatis diringkas agar tidak berulang.</span>
+                  <input type="date" id="cert-issued" name="issued_date" class="cert-field-control"
+                    aria-describedby="cert-issued-hint" data-error="cert-issued-error" required>
+                  <div id="cert-issued-error" class="cert-field-error">Error: Tanggal terbit sertifikat wajib diisi.</div>
+                </div>
+
+                <div class="cert-field-group is-full">
+                  <div class="cert-label-row">
+                    <span id="cert-divisions-label" class="cert-field-label">Bidang / Divisi Training (Dicetak di Sertifikat)</span>
+                    <button type="button" id="btn-cert-add-division" class="btn btn-secondary btn-sm">+ Tambah Divisi (Rotasi)</button>
+                  </div>
+                  <span id="cert-divisions-hint" class="cert-field-hint">Isi nama departemen saja (mis. Housekeeping, Food &amp; Beverage); kata "the ... Department" otomatis ditambahkan saat dicetak. Klik Tambah Divisi untuk rotasi lintas divisi.</span>
+                  <div id="cert-divisions-list" class="cert-divisions-stack" role="group" aria-labelledby="cert-divisions-label" aria-describedby="cert-divisions-hint"></div>
+                  <datalist id="cert-dept-options">
+                    <option value="Front Office"></option>
+                    <option value="Housekeeping"></option>
+                    <option value="Food &amp; Beverage"></option>
+                    <option value="Food &amp; Beverage Service"></option>
+                    <option value="Restaurant"></option>
+                    <option value="Kitchen"></option>
+                    <option value="Bar &amp; Beverage"></option>
+                    <option value="Accounting"></option>
+                    <option value="Engineering"></option>
+                  </datalist>
+                </div>
+
+                <div class="cert-field-group is-full">
+                  <label for="cert-achievement-preset" class="cert-field-label">Predikat / Kompetensi (Opsional, Dicetak di Sertifikat)</label>
+                  <div class="cert-achievement-stack">
+                    <select id="cert-achievement-preset" class="cert-field-control" aria-label="Pilih template predikat sertifikat">
+                      <option value="">Tanpa kalimat predikat</option>
+                      <option value="Achieving an Excellent rating in hospitality service and professionalism.">Excellent (Sangat Memuaskan)</option>
+                      <option value="Achieving a Very Good rating in hospitality service and professionalism.">Very Good (Sangat Baik)</option>
+                      <option value="Achieving a Good rating in hospitality service and professionalism.">Good (Baik)</option>
+                      <option value="Demonstrating strong professionalism, dedication, and service competence.">Kompetensi &amp; Profesionalisme</option>
+                    </select>
+                    <label for="cert-achievement" class="visually-hidden">Kalimat predikat atau kompetensi pada sertifikat</label>
+                    <input type="text" id="cert-achievement" name="achievement_text" class="cert-field-control"
+                      placeholder="Opsional: pilih predikat di atas atau ketik kalimat Inggris sendiri...">
+                  </div>
+                </div>
+
+                <div class="cert-field-group is-full">
+                  <fieldset class="cert-paper-fieldset">
+                    <legend>Ukuran Kertas Cetak</legend>
+                    <div class="cert-paper-radios">
+                      <label class="cert-radio-option">
+                        <input type="radio" name="cert_paper_size" id="cert-paper-f4" value="F4" class="visually-hidden" checked>
+                        <span class="cert-radio-box">
+                          <span class="cert-radio-title">F4 / Folio Horizontal</span>
+                          <span class="cert-radio-sub">330 x 215 mm (Bawaan)</span>
+                        </span>
+                      </label>
+                      <label class="cert-radio-option">
+                        <input type="radio" name="cert_paper_size" id="cert-paper-a4" value="A4" class="visually-hidden">
+                        <span class="cert-radio-box">
+                          <span class="cert-radio-title">A4 Horizontal</span>
+                          <span class="cert-radio-sub">297 x 210 mm</span>
+                        </span>
+                      </label>
+                    </div>
+                  </fieldset>
+                </div>
+              </div>
+
+              <details id="cert-optional-details" class="cert-optional-details">
+                <summary class="cert-optional-summary">Detail Tambahan &amp; Arsip Peserta (Opsional)</summary>
+                <div class="cert-optional-body">
+                  <div class="cert-form-grid">
+                    <div class="cert-field-group is-full">
+                      <label for="cert-program" class="cert-field-label">Nama Program Pelatihan</label>
+                      <input type="text" id="cert-program" name="program_name" class="cert-field-control"
+                        placeholder="hospitality training program">
+                    </div>
+                    <div class="cert-field-group is-full">
+                      <label for="cert-institution" class="cert-field-label">Asal Sekolah / Kampus</label>
+                      <input type="text" id="cert-institution" name="institution" class="cert-field-control"
+                        placeholder="Poltekpar, SMK, Universitas...">
+                    </div>
+                    <div class="cert-field-group">
+                      <label for="cert-signer" class="cert-field-label">Nama Penandatangan</label>
+                      <input type="text" id="cert-signer" name="signer_name" class="cert-field-control"
+                        placeholder="Agus Sumardi Wijaya">
+                    </div>
+                    <div class="cert-field-group">
+                      <label for="cert-signer-title" class="cert-field-label">Jabatan Penandatangan</label>
+                      <input type="text" id="cert-signer-title" name="signer_title" class="cert-field-control"
+                        placeholder="General Manager">
+                    </div>
+                    <div class="cert-field-group is-full">
+                      <label for="cert-notes" class="cert-field-label">Catatan Arsip Internal</label>
+                      <input type="text" id="cert-notes" name="notes" class="cert-field-control"
+                        placeholder="Catatan pembimbing atau periode magang">
+                    </div>
+                  </div>
+                </div>
+              </details>
+
+              <div class="cert-form-actions">
+                <button type="submit" id="btn-cert-save" class="btn cert-btn-primary">
+                  Simpan Sertifikat
+                </button>
+                <button type="button" id="btn-cert-save-next" class="btn btn-secondary">
+                  Simpan &amp; Tambah Berikutnya
+                </button>
+              </div>
+            </form>
+          </section>
+
+          <!-- Right: Live WYSIWYG Preview & Export Toolbar -->
+          <section class="card cert-preview-card">
+            <div class="cert-preview-toolbar">
+              <div>
+                <h2 class="card-title">Pratinjau Sertifikat Langsung</h2>
+                <span id="cert-paper-dim-label" class="card-subtitle">Kertas F4 Horizontal (330 x 215 mm)</span>
+              </div>
+              <div class="cert-export-actions">
+                <button type="button" id="btn-cert-export-pdf" class="btn cert-btn-primary">
+                  Simpan PDF
+                </button>
+                <button type="button" id="btn-cert-print" class="btn btn-secondary">
+                  Cetak
+                </button>
+                <button type="button" id="btn-cert-export-png" class="btn btn-secondary">
+                  Unduh PNG (300 DPI)
+                </button>
+              </div>
+            </div>
+
+            <div class="cert-preview-stage">
+              <div id="cert-preview-frame" class="cert-paper-frame">
+                <div id="cert-preview-container" aria-label="Pratinjau Sertifikat"></div>
+              </div>
+            </div>
+
+            <div id="cert-status-live" class="cert-status-line info hidden" role="status" aria-live="polite"></div>
+          </section>
+        </div>
+
+        <!-- Bottom: Riwayat Sertifikat Tersimpan (SQLite) -->
+        <section class="table-section card mt-4">
+          <div class="cert-history-header">
+            <div>
+              <h2 id="cert-history-heading" class="card-title">Riwayat Sertifikat Tersimpan</h2>
+              <span id="cert-history-meta" class="card-subtitle">Memuat data sertifikat...</span>
+            </div>
+            <search>
+              <form id="form-cert-filter" class="cert-filter-form">
+                <label for="cert-filter-search" class="visually-hidden">Cari sertifikat</label>
+                <input type="search" id="cert-filter-search" class="cert-field-control cert-filter-search"
+                  autocorrect="off" autocapitalize="none" spellcheck="false"
+                  placeholder="Cari nama, nomor, kampus...">
+                <label for="cert-filter-year" class="visually-hidden">Filter tahun terbit</label>
+                <select id="cert-filter-year" class="cert-field-control cert-filter-select">
+                  <option value="all">Semua Tahun</option>
+                </select>
+                <label for="cert-filter-status" class="visually-hidden">Filter status sertifikat</label>
+                <select id="cert-filter-status" class="cert-field-control cert-filter-select">
+                  <option value="all">Semua Status</option>
+                  <option value="active">Aktif</option>
+                  <option value="revoked">Dibatalkan</option>
+                </select>
+                <button type="submit" id="btn-cert-filter" class="btn btn-secondary">Cari</button>
+              </form>
+            </search>
+          </div>
+
+          <div tabindex="0" role="region" aria-labelledby="cert-history-heading" class="cert-table-region">
+            <table class="cert-history-table">
+              <thead>
+                <tr>
+                  <th>Nomor</th>
+                  <th>Nama Penerima</th>
+                  <th>Durasi &amp; Periode</th>
+                  <th>Tgl Terbit</th>
+                  <th>Departemen / Kampus</th>
+                  <th>Kertas</th>
+                  <th>Status</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="cert-history-body">
+                <tr>
+                  <td colspan="8" class="text-center text-muted">Memuat riwayat sertifikat...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination-bar">
+            <div class="pagination-size">
+              <label for="cert-page-size">Baris per halaman:</label>
+              <select id="cert-page-size" class="form-control form-control-sm">
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
+            <div class="pagination-info" id="cert-page-info">Halaman 1 dari 1 (0 data)</div>
+            <div class="pagination-controls">
+              <button type="button" id="btn-cert-prev" class="btn btn-secondary btn-sm" disabled>&lt; Sebelumnya</button>
+              <button type="button" id="btn-cert-next" class="btn btn-secondary btn-sm" disabled>Selanjutnya &gt;</button>
+            </div>
+          </div>
+        </section>
+      </section>
+
     </main>
   </div>
 
@@ -1452,6 +1759,72 @@
     </div>
   </div>
 
+  <!-- Native Dialog: Pengaturan Default Sertifikat (Khusus Admin) -->
+  <dialog id="dialog-cert-settings" class="cert-settings-dialog" aria-labelledby="cert-settings-title">
+    <div class="modal-header">
+      <h2 id="cert-settings-title" class="modal-title">Pengaturan Default Sertifikat Training</h2>
+      <button type="button" id="btn-close-cert-settings" class="btn-close-modal" aria-label="Tutup pengaturan sertifikat">&times;</button>
+    </div>
+    <form id="form-cert-settings" class="modal-body">
+      <div class="cert-form-grid">
+        <div class="cert-field-group">
+          <label for="cfg-cert-signer" class="cert-field-label">Nama Penandatangan Default</label>
+          <input type="text" id="cfg-cert-signer" class="cert-field-control" required autofocus>
+        </div>
+        <div class="cert-field-group">
+          <label for="cfg-cert-title" class="cert-field-label">Jabatan Penandatangan Default</label>
+          <input type="text" id="cfg-cert-title" class="cert-field-control" required>
+        </div>
+        <div class="cert-field-group">
+          <label for="cfg-cert-program" class="cert-field-label">Nama Program Default</label>
+          <input type="text" id="cfg-cert-program" class="cert-field-control" required>
+        </div>
+        <div class="cert-field-group">
+          <label for="cfg-cert-paper" class="cert-field-label">Ukuran Kertas Default</label>
+          <select id="cfg-cert-paper" class="cert-field-control">
+            <option value="F4">F4 Horizontal (330 x 215 mm)</option>
+            <option value="A4">A4 Horizontal (297 x 210 mm)</option>
+          </select>
+        </div>
+      </div>
+
+      <label class="cert-checkbox-row">
+        <input type="checkbox" id="cfg-cert-show-sig">
+        <span>Tampilkan gambar tanda tangan / stempel digital di atas garis tanda tangan</span>
+      </label>
+
+      <div class="cert-asset-grid">
+        <div class="cert-asset-box">
+          <span class="cert-field-label">Logo Sertifikat (PNG Transparan)</span>
+          <div class="cert-asset-thumb">
+            <img id="cfg-cert-logo-preview" alt="Logo Sertifikat Aktif" width="160" height="72">
+          </div>
+          <div class="cert-asset-actions">
+            <button type="button" id="btn-cfg-upload-logo" class="btn btn-secondary btn-sm">Ganti Logo</button>
+            <button type="button" id="btn-cfg-reset-logo" class="btn btn-secondary btn-sm">Pakai Bawaan</button>
+          </div>
+        </div>
+        <div class="cert-asset-box">
+          <span class="cert-field-label">Tanda Tangan / Stempel (Opsional)</span>
+          <div class="cert-asset-thumb">
+            <img id="cfg-cert-sig-preview" class="hidden" alt="Tanda Tangan Digital Aktif" width="160" height="72">
+            <span id="cfg-cert-sig-empty" class="text-muted" style="font-size: 11.5px;">Tanda tangan basah (kosong)</span>
+          </div>
+          <div class="cert-asset-actions">
+            <button type="button" id="btn-cfg-upload-sig" class="btn btn-secondary btn-sm">Unggah PNG</button>
+            <button type="button" id="btn-cfg-clear-sig" class="btn btn-secondary btn-sm">Hapus TTD</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="btn-cancel-cert-settings" class="btn btn-secondary">Batal</button>
+        <button type="submit" id="btn-save-cert-settings" class="btn cert-btn-primary">Simpan Pengaturan</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="cert-print-stage" aria-hidden="true"></div>
 
   <script src="app.js"></script>
 </body>

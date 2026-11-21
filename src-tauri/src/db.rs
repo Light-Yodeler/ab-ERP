@@ -257,12 +257,39 @@ pub fn init_db_with_migration(db_path: &Path, auto_migrate: bool) -> Result<Conn
         CREATE INDEX IF NOT EXISTS idx_room_res_date ON room_reservations(date);
         CREATE INDEX IF NOT EXISTS idx_room_res_checkin ON room_reservations(check_in_date);
         CREATE INDEX IF NOT EXISTS idx_room_res_unit_date ON room_reservations(unit, date);
-        CREATE INDEX IF NOT EXISTS idx_room_res_trans_id ON room_reservations(transaction_id);",
+        CREATE INDEX IF NOT EXISTS idx_room_res_trans_id ON room_reservations(transaction_id);
+
+        CREATE TABLE IF NOT EXISTS training_certificates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            certificate_no TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            recipient_name TEXT NOT NULL,
+            duration_text TEXT NOT NULL,
+            program_name TEXT NOT NULL DEFAULT 'hospitality training program',
+            start_date TEXT NOT NULL,
+            end_date TEXT NOT NULL,
+            issued_date TEXT NOT NULL,
+            department TEXT,
+            institution TEXT,
+            achievement_text TEXT,
+            notes TEXT,
+            signer_name TEXT NOT NULL DEFAULT 'Agus Sumardi Wijaya',
+            signer_title TEXT NOT NULL DEFAULT 'General Manager',
+            paper_size TEXT NOT NULL DEFAULT 'F4' CHECK(paper_size IN ('F4', 'A4')),
+            status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'revoked')),
+            created_by TEXT,
+            created_at DATETIME DEFAULT (datetime('now', 'localtime')),
+            updated_at DATETIME DEFAULT (datetime('now', 'localtime'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_cert_issued_date ON training_certificates(issued_date);
+        CREATE INDEX IF NOT EXISTS idx_cert_status ON training_certificates(status);
+        CREATE INDEX IF NOT EXISTS idx_cert_recipient ON training_certificates(recipient_name);",
     )
     .map_err(|e| format!("Gagal membuat skema database: {}", e))?;
-    // Auto-migration for import_logs
+    // Auto-migration for existing databases
     let _ = conn.execute("ALTER TABLE import_logs ADD COLUMN period TEXT", []);
     let _ = conn.execute("ALTER TABLE import_logs ADD COLUMN file_hash TEXT", []);
+    let _ = conn.execute("ALTER TABLE training_certificates ADD COLUMN achievement_text TEXT", []);
     // Backfill period for legacy import_logs from transactions
     let _ = conn.execute(
         "UPDATE import_logs 
@@ -345,6 +372,13 @@ pub fn init_db_with_migration(db_path: &Path, auto_migrate: bool) -> Result<Conn
         ("signName", "Pimpinan / Pengelola"),
         ("officerName", "Petugas Bapenda Lombok Tengah"),
         ("officerNip", "NIP. 19800101 200501 1 001"),
+        ("certSignerName", "Agus Sumardi Wijaya"),
+        ("certSignerTitle", "General Manager"),
+        ("certProgramName", "hospitality training program"),
+        ("certPaperSize", "F4"),
+        ("certShowSignature", "0"),
+        ("certLogoFile", ""),
+        ("certSignatureFile", ""),
     ];
 
     for (k, v) in default_settings.iter() {
@@ -1264,4 +1298,502 @@ pub fn restore_database(db_path: &Path, source_backup_path: &Path) -> Result<Str
         .map_err(|e| format!("Proses pemulihan database gagal: {}", e))?;
 
     Ok(db_path.to_string_lossy().to_string())
+}
+
+// ==========================================
+// Training Certificates CRUD & Pagination
+// ==========================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrainingCertificateRow {
+    pub id: i64,
+    pub certificate_no: String,
+    pub recipient_name: String,
+    pub duration_text: String,
+    pub program_name: String,
+    pub start_date: String,
+    pub end_date: String,
+    pub issued_date: String,
+    pub department: Option<String>,
+    pub institution: Option<String>,
+    pub achievement_text: Option<String>,
+    pub notes: Option<String>,
+    pub signer_name: String,
+    pub signer_title: String,
+    pub paper_size: String,
+    pub status: String,
+    pub created_by: Option<String>,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrainingCertificateInput {
+    pub certificate_no: Option<String>,
+    pub recipient_name: String,
+    pub duration_text: String,
+    pub program_name: Option<String>,
+    pub start_date: String,
+    pub end_date: String,
+    pub issued_date: String,
+    pub department: Option<String>,
+    pub institution: Option<String>,
+    #[serde(default)]
+    pub achievement_text: Option<String>,
+    pub notes: Option<String>,
+    pub signer_name: Option<String>,
+    pub signer_title: Option<String>,
+    pub paper_size: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaginatedCertificates {
+    pub items: Vec<TrainingCertificateRow>,
+    pub total_count: usize,
+    pub active_count: usize,
+    pub revoked_count: usize,
+    pub page: usize,
+    pub page_size: usize,
+    pub total_pages: usize,
+}
+
+struct ResolvedCertificateFields {
+    recipient_name: String,
+    duration_text: String,
+    program_name: String,
+    start_iso: String,
+    end_iso: String,
+    issued_iso: String,
+    issued_year: i32,
+    department: Option<String>,
+    institution: Option<String>,
+    achievement_text: Option<String>,
+    notes: Option<String>,
+    signer_name: String,
+    signer_title: String,
+    paper_size: String,
+}
+
+fn resolve_certificate_fields(
+    conn: &Connection,
+    input: &TrainingCertificateInput,
+) -> Result<ResolvedCertificateFields, String> {
+    let recipient_name = input.recipient_name.trim();
+    if recipient_name.is_empty() {
+        return Err("Nama penerima sertifikat wajib diisi.".to_string());
+    }
+    let duration_text = input.duration_text.trim();
+    if duration_text.is_empty() {
+        return Err("Durasi pelatihan wajib diisi.".to_string());
+    }
+
+    let (start_d, start_iso) = normalize_iso_date(&input.start_date, "tanggal mulai")?;
+    let (end_d, end_iso) = normalize_iso_date(&input.end_date, "tanggal selesai")?;
+    if end_d < start_d {
+        return Err("Tanggal selesai pelatihan tidak boleh lebih awal dari tanggal mulai.".to_string());
+    }
+    let (issued_d, issued_iso) = normalize_iso_date(&input.issued_date, "tanggal terbit")?;
+
+    let settings = get_settings(conn)?;
+    let setting_or = |key: &str, fallback: &str| -> String {
+        settings
+            .get(key)
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .unwrap_or(fallback)
+            .to_string()
+    };
+    let clean_or_default = |opt: &Option<String>, fallback: &str| -> String {
+        opt.as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .unwrap_or(fallback)
+            .to_string()
+    };
+
+    let default_program = setting_or("certProgramName", "hospitality training program");
+    let default_signer = setting_or("certSignerName", "Agus Sumardi Wijaya");
+    let default_title = setting_or("certSignerTitle", "General Manager");
+    let default_paper = setting_or("certPaperSize", "F4");
+
+    Ok(ResolvedCertificateFields {
+        recipient_name: recipient_name.to_string(),
+        duration_text: duration_text.to_string(),
+        program_name: clean_or_default(&input.program_name, &default_program),
+        start_iso,
+        end_iso,
+        issued_iso,
+        issued_year: chrono::Datelike::year(&issued_d),
+        department: clean_optional_field(&input.department),
+        institution: clean_optional_field(&input.institution),
+        achievement_text: clean_optional_field(&input.achievement_text),
+        notes: clean_optional_field(&input.notes),
+        signer_name: clean_or_default(&input.signer_name, &default_signer),
+        signer_title: clean_or_default(&input.signer_title, &default_title),
+        paper_size: normalize_paper_size(input.paper_size.as_deref(), &default_paper)?,
+    })
+}
+
+fn normalize_paper_size(raw: Option<&str>, fallback: &str) -> Result<String, String> {
+    match raw.map(str::trim).filter(|s| !s.is_empty()) {
+        None => Ok(fallback.to_string()),
+        Some(s) if s.eq_ignore_ascii_case("F4") => Ok("F4".to_string()),
+        Some(s) if s.eq_ignore_ascii_case("A4") => Ok("A4".to_string()),
+        Some(other) => Err(format!(
+            "Ukuran kertas '{}' tidak didukung (gunakan F4 atau A4).",
+            other
+        )),
+    }
+}
+
+fn map_cert_db_error(err: rusqlite::Error, cert_no: &str, op_label: &str) -> String {
+    if let rusqlite::Error::SqliteFailure(ffi_err, _) = &err {
+        if ffi_err.extended_code == 2067 || ffi_err.code == rusqlite::ErrorCode::ConstraintViolation {
+            return format!(
+                "Nomor sertifikat '{}' sudah terdaftar. Gunakan nomor lain.",
+                cert_no
+            );
+        }
+    }
+    let msg = err.to_string();
+    if msg.contains("UNIQUE constraint failed") {
+        format!(
+            "Nomor sertifikat '{}' sudah terdaftar. Gunakan nomor lain.",
+            cert_no
+        )
+    } else {
+        format!("Gagal {}: {}", op_label, msg)
+    }
+}
+
+fn map_certificate_row(r: &rusqlite::Row) -> rusqlite::Result<TrainingCertificateRow> {
+    Ok(TrainingCertificateRow {
+        id: r.get(0)?,
+        certificate_no: r.get(1)?,
+        recipient_name: r.get(2)?,
+        duration_text: r.get(3)?,
+        program_name: r.get(4)?,
+        start_date: r.get(5)?,
+        end_date: r.get(6)?,
+        issued_date: r.get(7)?,
+        department: r.get(8)?,
+        institution: r.get(9)?,
+        achievement_text: r.get(10)?,
+        notes: r.get(11)?,
+        signer_name: r.get(12)?,
+        signer_title: r.get(13)?,
+        paper_size: r.get(14)?,
+        status: r.get(15)?,
+        created_by: r.get(16)?,
+        created_at: r.get(17)?,
+        updated_at: r.get(18)?,
+    })
+}
+
+/// Computes the next available sequential `NNN/ABR/YYYY` certificate number for `year`.
+pub fn get_next_certificate_number(conn: &Connection, year: i32) -> Result<String, String> {
+    let pattern = format!("%/{}", year);
+    let mut stmt = conn
+        .prepare("SELECT certificate_no FROM training_certificates WHERE certificate_no LIKE ?1")
+        .map_err(|e| format!("Gagal membaca urutan nomor sertifikat: {}", e))?;
+    let rows = stmt
+        .query_map(params![pattern], |r| r.get::<_, String>(0))
+        .map_err(|e| format!("Gagal memindai nomor sertifikat: {}", e))?;
+
+    let mut max_seq: u32 = 0;
+    for res in rows {
+        let cert_no = res.map_err(|e| e.to_string())?;
+        if let Some(first_seg) = cert_no.split('/').next() {
+            if let Ok(num) = first_seg.trim().parse::<u32>() {
+                if num > max_seq {
+                    max_seq = num;
+                }
+            }
+        }
+    }
+    Ok(format!("{:03}/ABR/{}", max_seq + 1, year))
+}
+
+/// Fetches a single training certificate record by primary key ID.
+pub fn get_certificate_by_id(conn: &Connection, id: i64) -> Result<TrainingCertificateRow, String> {
+    conn.query_row(
+        "SELECT id, certificate_no, recipient_name, duration_text, program_name,
+                start_date, end_date, issued_date, department, institution, achievement_text, notes,
+                signer_name, signer_title, paper_size, status, created_by, created_at, updated_at
+         FROM training_certificates WHERE id = ?1",
+        params![id],
+        map_certificate_row,
+    )
+    .map_err(|e| match e {
+        rusqlite::Error::QueryReturnedNoRows => "Data sertifikat tidak ditemukan.".to_string(),
+        other => format!("Gagal membaca data sertifikat: {}", other),
+    })
+}
+
+/// Validates input fields and creates a new training certificate record in SQLite.
+pub fn create_certificate(
+    conn: &Connection,
+    input: &TrainingCertificateInput,
+    created_by: Option<&str>,
+) -> Result<TrainingCertificateRow, String> {
+    let fields = resolve_certificate_fields(conn, input)?;
+    let certificate_no = match input
+        .certificate_no
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        Some(manual) => manual.to_string(),
+        None => get_next_certificate_number(conn, fields.issued_year)?,
+    };
+    let creator = created_by.map(str::trim).filter(|s| !s.is_empty());
+
+    conn.execute(
+        "INSERT INTO training_certificates
+         (certificate_no, recipient_name, duration_text, program_name, start_date, end_date,
+          issued_date, department, institution, achievement_text, notes, signer_name, signer_title,
+          paper_size, status, created_by)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, 'active', ?15)",
+        params![
+            certificate_no,
+            fields.recipient_name,
+            fields.duration_text,
+            fields.program_name,
+            fields.start_iso,
+            fields.end_iso,
+            fields.issued_iso,
+            fields.department,
+            fields.institution,
+            fields.achievement_text,
+            fields.notes,
+            fields.signer_name,
+            fields.signer_title,
+            fields.paper_size,
+            creator,
+        ],
+    )
+    .map_err(|e| map_cert_db_error(e, &certificate_no, "menyimpan sertifikat"))?;
+
+    get_certificate_by_id(conn, conn.last_insert_rowid())
+}
+
+/// Validates input fields and updates an existing training certificate record.
+pub fn update_certificate(
+    conn: &Connection,
+    id: i64,
+    input: &TrainingCertificateInput,
+) -> Result<TrainingCertificateRow, String> {
+    let certificate_no = input
+        .certificate_no
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "Nomor sertifikat wajib diisi.".to_string())?;
+    let fields = resolve_certificate_fields(conn, input)?;
+
+    let affected = conn
+        .execute(
+            "UPDATE training_certificates
+             SET certificate_no = ?1,
+                 recipient_name = ?2,
+                 duration_text = ?3,
+                 program_name = ?4,
+                 start_date = ?5,
+                 end_date = ?6,
+                 issued_date = ?7,
+                 department = ?8,
+                 institution = ?9,
+                 achievement_text = ?10,
+                 notes = ?11,
+                 signer_name = ?12,
+                 signer_title = ?13,
+                 paper_size = ?14,
+                 updated_at = datetime('now', 'localtime')
+             WHERE id = ?15",
+            params![
+                certificate_no,
+                fields.recipient_name,
+                fields.duration_text,
+                fields.program_name,
+                fields.start_iso,
+                fields.end_iso,
+                fields.issued_iso,
+                fields.department,
+                fields.institution,
+                fields.achievement_text,
+                fields.notes,
+                fields.signer_name,
+                fields.signer_title,
+                fields.paper_size,
+                id,
+            ],
+        )
+        .map_err(|e| map_cert_db_error(e, certificate_no, "memperbarui sertifikat"))?;
+
+    if affected == 0 {
+        return Err("Data sertifikat tidak ditemukan.".to_string());
+    }
+    get_certificate_by_id(conn, id)
+}
+
+/// Sets a training certificate's lifecycle status (`"active"` or `"revoked"`).
+pub fn set_certificate_status(
+    conn: &Connection,
+    id: i64,
+    status: &str,
+) -> Result<TrainingCertificateRow, String> {
+    let clean_status = status.trim();
+    if clean_status != "active" && clean_status != "revoked" {
+        return Err("Status sertifikat tidak valid (gunakan 'active' atau 'revoked').".to_string());
+    }
+    let affected = conn
+        .execute(
+            "UPDATE training_certificates SET status = ?1, updated_at = datetime('now', 'localtime') WHERE id = ?2",
+            params![clean_status, id],
+        )
+        .map_err(|e| format!("Gagal mengubah status sertifikat: {}", e))?;
+    if affected == 0 {
+        return Err("Data sertifikat tidak ditemukan.".to_string());
+    }
+    get_certificate_by_id(conn, id)
+}
+
+/// Permanently removes a training certificate record from SQLite.
+pub fn delete_certificate(conn: &Connection, id: i64) -> Result<(), String> {
+    let affected = conn
+        .execute("DELETE FROM training_certificates WHERE id = ?1", params![id])
+        .map_err(|e| format!("Gagal menghapus sertifikat: {}", e))?;
+    if affected == 0 {
+        return Err("Data sertifikat tidak ditemukan.".to_string());
+    }
+    Ok(())
+}
+
+/// Queries training certificates with SQL year, status, search filters and pagination.
+pub fn get_paginated_certificates(
+    conn: &Connection,
+    year: Option<&str>,
+    status: Option<&str>,
+    search: Option<&str>,
+    page: usize,
+    page_size: usize,
+) -> Result<PaginatedCertificates, String> {
+    let requested_page = if page == 0 { 1 } else { page };
+    let size = if page_size == 0 { 25 } else { page_size.clamp(1, 100) };
+
+    let mut where_clauses: Vec<String> = Vec::new();
+    let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+    if let Some(y) = year.map(str::trim) {
+        if !y.is_empty() && y != "all" {
+            where_clauses.push(format!("substr(issued_date, 1, 4) = ?{}", params_vec.len() + 1));
+            params_vec.push(Box::new(y.to_string()));
+        }
+    }
+
+    if let Some(st) = status.map(str::trim) {
+        if !st.is_empty() && st != "all" {
+            where_clauses.push(format!("status = ?{}", params_vec.len() + 1));
+            params_vec.push(Box::new(st.to_string()));
+        }
+    }
+
+    if let Some(s) = search.map(str::trim) {
+        if !s.is_empty() {
+            let idx = params_vec.len() + 1;
+            where_clauses.push(format!(
+                "(certificate_no LIKE ?{0} OR recipient_name LIKE ?{0} OR COALESCE(department, '') LIKE ?{0} OR COALESCE(institution, '') LIKE ?{0} OR COALESCE(achievement_text, '') LIKE ?{0} OR program_name LIKE ?{0} OR COALESCE(notes, '') LIKE ?{0})",
+                idx
+            ));
+            params_vec.push(Box::new(format!("%{}%", s)));
+        }
+    }
+
+    let where_str = if where_clauses.is_empty() {
+        String::new()
+    } else {
+        format!("WHERE {}", where_clauses.join(" AND "))
+    };
+
+    let count_sql = format!(
+        "SELECT COUNT(*),
+                COALESCE(SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN status = 'revoked' THEN 1 ELSE 0 END), 0)
+         FROM training_certificates {}",
+        where_str
+    );
+
+    let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|b| b.as_ref()).collect();
+    let (total_count, active_count, revoked_count): (i64, i64, i64) = conn
+        .query_row(&count_sql, params_refs.as_slice(), |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        })
+        .map_err(|e| format!("Gagal menghitung riwayat sertifikat: {}", e))?;
+
+    let total_pages = if total_count == 0 {
+        1
+    } else {
+        ((total_count as usize) + size - 1) / size
+    };
+    let p = requested_page.min(total_pages);
+    let offset = (p - 1) * size;
+
+    let limit_idx = params_vec.len() + 1;
+    let offset_idx = params_vec.len() + 2;
+    let items_sql = format!(
+        "SELECT id, certificate_no, recipient_name, duration_text, program_name,
+                start_date, end_date, issued_date, department, institution, achievement_text, notes,
+                signer_name, signer_title, paper_size, status, created_by, created_at, updated_at
+         FROM training_certificates {}
+         ORDER BY issued_date DESC, id DESC
+         LIMIT ?{} OFFSET ?{}",
+        where_str, limit_idx, offset_idx
+    );
+
+    let mut query_params: Vec<Box<dyn rusqlite::ToSql>> = params_vec;
+    query_params.push(Box::new(size as i64));
+    query_params.push(Box::new(offset as i64));
+    let query_refs: Vec<&dyn rusqlite::ToSql> = query_params.iter().map(|b| b.as_ref()).collect();
+
+    let mut stmt = conn
+        .prepare(&items_sql)
+        .map_err(|e| format!("Gagal mempersiapkan query sertifikat: {}", e))?;
+    let items = stmt
+        .query_map(query_refs.as_slice(), map_certificate_row)
+        .map_err(|e| format!("Gagal membaca daftar sertifikat: {}", e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+
+    Ok(PaginatedCertificates {
+        items,
+        total_count: total_count as usize,
+        active_count: active_count as usize,
+        revoked_count: revoked_count as usize,
+        page: p,
+        page_size: size,
+        total_pages,
+    })
+}
+
+/// Lists all distinct issuance years (`YYYY`) present in `training_certificates` descending.
+pub fn get_certificate_years(conn: &Connection) -> Result<Vec<String>, String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT DISTINCT substr(issued_date, 1, 4) AS yr
+             FROM training_certificates
+             WHERE length(issued_date) >= 4
+             ORDER BY yr DESC",
+        )
+        .map_err(|e| format!("Gagal mengambil daftar tahun sertifikat: {}", e))?;
+    let rows = stmt
+        .query_map([], |r| r.get::<_, String>(0))
+        .map_err(|e| e.to_string())?;
+    let mut years = Vec::new();
+    for r in rows {
+        let y = r.map_err(|e| e.to_string())?;
+        if !y.is_empty() {
+            years.push(y);
+        }
+    }
+    Ok(years)
 }
