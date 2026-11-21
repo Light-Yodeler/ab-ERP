@@ -1,0 +1,1458 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anda ERP - Sistem Pelaporan Pendapatan & Pajak Daerah</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ========================================================================= -->
+  <!-- 1. PIN Authentication Screen / Overlay                                   -->
+  <!-- ========================================================================= -->
+  <div id="login-screen" class="login-overlay">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M3 9h18M9 21V9" />
+          </svg>
+        </div>
+        <h1 class="login-title">Anda ERP</h1>
+        <p class="login-subtitle">Anda Bungalows & Restaurant</p>
+      </div>
+
+      <!-- User Account Selector -->
+      <div class="user-selector">
+        <button type="button" class="btn-user-select active" data-username="admin">
+          <span class="user-role-badge">Admin</span>
+          <span class="user-name">Administrator</span>
+        </button>
+        <button type="button" class="btn-user-select" data-username="staff">
+          <span class="user-role-badge">Staff</span>
+          <span class="user-name">Staff Pelaporan</span>
+        </button>
+      </div>
+
+      <!-- PIN Input Display -->
+      <div class="pin-display">
+        <div class="pin-dots" id="pin-dots">
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+        <p class="pin-hint">Masukkan 4-8 digit PIN keamanan</p>
+      </div>
+
+      <div id="login-error" class="login-error hidden"></div>
+
+      <!-- Numeric Keypad -->
+      <div class="keypad-grid">
+        <button type="button" class="btn-key" data-key="1">1</button>
+        <button type="button" class="btn-key" data-key="2">2</button>
+        <button type="button" class="btn-key" data-key="3">3</button>
+        <button type="button" class="btn-key" data-key="4">4</button>
+        <button type="button" class="btn-key" data-key="5">5</button>
+        <button type="button" class="btn-key" data-key="6">6</button>
+        <button type="button" class="btn-key" data-key="7">7</button>
+        <button type="button" class="btn-key" data-key="8">8</button>
+        <button type="button" class="btn-key" data-key="9">9</button>
+        <button type="button" class="btn-key btn-key-action" data-key="clear">C</button>
+        <button type="button" class="btn-key" data-key="0">0</button>
+        <button type="button" class="btn-key btn-key-action" data-key="backspace">⌫</button>
+      </div>
+
+      <button type="button" id="btn-submit-pin" class="btn btn-primary btn-block btn-login">
+        Masuk ke Sistem
+      </button>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 2. Main Desktop ERP Application Layout                                    -->
+  <!-- ========================================================================= -->
+  <div id="app-layout" class="app-layout hidden">
+    <!-- Top ERP Header -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="header-brand">
+          <div class="brand-badge-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 21h18M3 7v1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7M4 4h16v3H4z" />
+            </svg>
+          </div>
+          <div class="brand-text">
+            <div class="brand-title">ANDA ERP</div>
+            <div class="brand-subtitle">Pelaporan & Rekapitulasi Pajak</div>
+          </div>
+        </div>
+
+        <!-- Global Unit Switcher Tabs -->
+        <div class="unit-switcher" role="tablist" aria-label="Pilih Unit Bisnis">
+          <button type="button" class="unit-tab active" data-unit="Bungalows">
+            Bungalows
+          </button>
+          <button type="button" class="unit-tab" data-unit="Restaurant">
+            Restaurant
+          </button>
+        </div>
+      </div>
+
+      <!-- Categorized ERP Dropdown Menus -->
+      <nav class="module-nav" aria-label="Navigasi Menu ERP">
+        <!-- 1. Dropdown Menu: Pajak Daerah -->
+        <div class="nav-dropdown" data-dropdown="pajak">
+          <button type="button" class="nav-dropdown-toggle active" aria-haspopup="true" aria-expanded="false">
+            <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 20V10M12 20V4M6 20v-6" />
+            </svg>
+            <span>Pajak Daerah</span>
+            <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="nav-dropdown-menu">
+            <button type="button" class="dropdown-item active" data-action="view-tab" data-tab="recap">
+              <div class="item-title">Rekapitulasi Pajak (10%)</div>
+              <div class="item-desc">Omset harian kalender 1-31 hari &amp; perhitungan PB1</div>
+            </button>
+            <button type="button" class="dropdown-item" data-action="open-print">
+              <div class="item-title">Cetak Formulir Resmi</div>
+              <div class="item-desc">Pratinjau cetak A4 landscape Bapenda &amp; tanda tangan</div>
+            </button>
+            <div class="dropdown-divider"></div>
+            <button type="button" class="dropdown-item" data-action="view-tab" data-tab="tourism">
+              <div class="item-title">Pendataan Wisatawan (Form 1)</div>
+              <div class="item-desc">Rekap bulanan Dinas Pariwisata: 4 minggu, kamar/bed &amp; negara asal</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. Dropdown Menu: Transaksi & Berkas -->
+        <div class="nav-dropdown" data-dropdown="transaksi">
+          <button type="button" class="nav-dropdown-toggle" aria-haspopup="true" aria-expanded="false">
+            <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+            </svg>
+            <span>Transaksi &amp; Berkas</span>
+            <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="nav-dropdown-menu">
+            <button type="button" class="dropdown-item" data-action="view-tab" data-tab="ledger">
+              <div class="item-title">Data Mentah (Ledger)</div>
+              <div class="item-desc">Tabel transaksi harian, paginasi SQL &amp; pencarian</div>
+            </button>
+            <button type="button" class="dropdown-item" data-action="open-add-transaction">
+              <div class="item-title">+ Tambah Transaksi Manual</div>
+              <div class="item-desc">Input transaksi baru langsung ke database</div>
+            </button>
+            <div class="dropdown-divider"></div>
+            <button type="button" class="dropdown-item" data-action="view-tab" data-tab="imports">
+              <div class="item-title">Unggah &amp; Impor Excel</div>
+              <div class="item-desc">Parser Calamine, deteksi unit &amp; auto-arsip berkas</div>
+            </button>
+            <button type="button" class="dropdown-item" data-action="view-tab" data-tab="imports" data-focus="logs">
+              <div class="item-title">Riwayat Berkas Diimpor</div>
+              <div class="item-desc">Daftar arsip fisik berkas spreadsheet yang tersimpan</div>
+            </button>
+            <div class="dropdown-divider"></div>
+            <button type="button" class="dropdown-item" data-action="download-template">
+              <div class="item-title">Unduh Template Excel</div>
+              <div class="item-desc">Unduh format template spreadsheet (.xlsx) siap pakai</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- 3. Dropdown Menu: Audit & Akuntansi -->
+        <div class="nav-dropdown" data-dropdown="audit">
+          <button type="button" class="nav-dropdown-toggle" aria-haspopup="true" aria-expanded="false">
+            <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10" />
+              <path d="m4.93 4.93 4.24 4.24M14.83 9.17l4.24-4.24M14.83 14.83l4.24 4.24M9.17 14.83l-4.24 4.24" />
+            </svg>
+            <span>Audit &amp; Rekonsiliasi</span>
+            <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="nav-dropdown-menu">
+            <button type="button" class="dropdown-item" data-action="view-tab" data-tab="optimizer">
+              <div class="item-title">Audit Target Solver</div>
+              <div class="item-desc">Otomasi rekonsiliasi subset sum template 13 kolom &amp; 2 kolom</div>
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      <!-- Right Header Actions -->
+      <div class="header-right">
+        <!-- Live System Clock Badge -->
+        <div id="system-clock-badge" class="system-clock-badge" title="Waktu Sistem Komputer Saat Ini">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 13px; height: 13px; opacity: 0.7;">
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+          <span id="system-clock-time">--:--:--</span>
+        </div>
+
+        <!-- User Badge -->
+        <div id="user-badge" class="user-badge" title="Pengguna aktif">
+          <span id="badge-name" class="badge-name">Administrator</span>
+          <span id="badge-role" class="badge-role">admin</span>
+        </div>
+
+        <!-- Settings Button -->
+        <button id="btn-open-settings" class="btn btn-icon" title="Pengaturan Sistem" aria-label="Pengaturan">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        </button>
+
+        <!-- Theme Toggle -->
+        <button id="theme-toggle" class="btn btn-icon" title="Ganti Tema (Terang / Gelap)" aria-label="Ganti Tema">
+          <svg id="theme-icon-sun" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5" />
+            <line x1="12" y1="1" x2="12" y2="3" />
+            <line x1="12" y1="21" x2="12" y2="23" />
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+            <line x1="1" y1="12" x2="3" y2="12" />
+            <line x1="21" y1="12" x2="23" y2="12" />
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+          </svg>
+          <svg id="theme-icon-moon" class="icon hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
+        </button>
+
+        <!-- Logout Button -->
+        <button id="btn-logout" class="btn btn-icon btn-logout" title="Keluar dari Akun" aria-label="Keluar">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Views Container -->
+    <main class="app-main-view">
+
+      <!-- =================================================================== -->
+      <!-- TAB 1: REKAPITULASI PAJAK (BAPENDA)                                 -->
+      <!-- =================================================================== -->
+      <section id="view-recap" class="module-view active">
+        <!-- Control Bar -->
+        <div class="view-header-bar">
+          <div class="header-filters">
+            <label for="recap-month-select" class="filter-label">Periode Bulan:</label>
+            <select id="recap-month-select" class="form-control select-month">
+              <option value="">Memuat periode...</option>
+            </select>
+            <button id="btn-refresh-recap" class="btn btn-secondary btn-sm" title="Muat Ulang Data">
+              Segarkan
+            </button>
+          </div>
+          <div class="header-actions">
+            <button id="btn-print-recap" class="btn btn-primary">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 6 2 18 2 18 9" />
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                <rect x="6" y="14" width="12" height="8" />
+              </svg>
+              Cetak Formulir Resmi
+            </button>
+            <button id="btn-export-recap-csv" class="btn btn-secondary">
+              Ekspor CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI Metric Cards Grid -->
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <span class="kpi-label">Total Omset Kotor</span>
+            <div id="kpi-total-revenue" class="kpi-value text-accent">Rp 0</div>
+            <span id="kpi-doc-no" class="kpi-subtext">No: -</span>
+          </div>
+
+          <div class="kpi-card">
+            <span class="kpi-label">Tarif Pajak Daerah</span>
+            <div id="kpi-tax-rate" class="kpi-value">10%</div>
+            <span class="kpi-subtext">Pajak Hotel / Restoran (PB1)</span>
+          </div>
+
+          <div class="kpi-card highlight-card">
+            <span id="kpi-tax-due-label" class="kpi-label">Pajak Terutang (10%)</span>
+            <div id="kpi-tax-due" class="kpi-value text-warning">Rp 0</div>
+            <span class="kpi-subtext">Kewajiban Setor Dispenda</span>
+          </div>
+
+          <div class="kpi-card">
+            <span class="kpi-label">Pendapatan Bersih</span>
+            <div id="kpi-net-revenue" class="kpi-value text-success">Rp 0</div>
+            <span class="kpi-subtext">Omset Kotor - Pajak</span>
+          </div>
+
+          <div class="kpi-card">
+            <span class="kpi-label">Aktivitas Kalender</span>
+            <div id="kpi-active-days" class="kpi-value">0 / 0 Hari</div>
+            <span id="kpi-zero-days" class="kpi-subtext">0 Hari Nihil</span>
+          </div>
+
+          <div class="kpi-card">
+            <span class="kpi-label">Rata-rata / Hari</span>
+            <div id="kpi-avg-day" class="kpi-value">Rp 0</div>
+            <span id="kpi-max-day" class="kpi-subtext">Tertinggi: Rp 0</span>
+          </div>
+        </div>
+
+        <!-- Daily Trend Bar Chart Section -->
+        <div class="chart-section card">
+          <div class="card-header">
+            <h2 class="card-title">Grafik Tren Omset Harian</h2>
+            <span id="chart-month-label" class="card-subtitle">-</span>
+          </div>
+          <div class="chart-container">
+            <svg id="recap-bar-chart" class="bar-chart-svg" preserveAspectRatio="none" viewBox="0 0 1000 160">
+              <!-- Rendered via JS -->
+            </svg>
+            <div id="chart-tooltip" class="chart-tooltip hidden"></div>
+          </div>
+        </div>
+
+        <!-- Daily Calendar Recapitulation Table (1..31 days) -->
+        <div class="table-section card">
+          <div class="card-header">
+            <h2 class="card-title">Tabel Rincian Harian Kalender Bulan</h2>
+            <span id="table-record-count" class="card-subtitle">31 Hari</span>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 70px;">Hari Ke</th>
+                  <th style="width: 130px;">Tanggal</th>
+                  <th style="width: 110px;">Hari</th>
+                  <th style="text-align: right; width: 180px;">Omset Harian</th>
+                  <th style="width: 110px; text-align: center;">Status</th>
+                  <th style="text-align: right; width: 200px;">Akumulasi Saldo</th>
+                </tr>
+              </thead>
+              <tbody id="recap-table-body">
+                <tr>
+                  <td colspan="6" class="text-center text-muted">Silakan pilih periode bulan di atas.</td>
+                </tr>
+              </tbody>
+              <tfoot id="recap-table-foot">
+                <!-- Sum rows -->
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- TAB 2: DATA MENTAH / LEDGER TRANSAKSI                               -->
+      <!-- =================================================================== -->
+      <section id="view-ledger" class="module-view">
+        <div class="view-header-bar">
+          <div class="header-filters">
+            <div class="unit-switcher" role="tablist" aria-label="Mode Tampilan Data">
+              <button type="button" class="unit-tab ledger-mode-tab active" data-ledger-mode="summary">
+                Ringkas (3 Kolom)
+              </button>
+              <button type="button" class="unit-tab ledger-mode-tab" data-ledger-mode="reservations">
+                Rincian Reservasi (13 Kolom)
+              </button>
+            </div>
+
+            <label for="ledger-month-select" class="filter-label">Periode:</label>
+            <select id="ledger-month-select" class="form-control select-month">
+              <option value="all">Semua Periode</option>
+            </select>
+
+            <div class="search-input-wrapper">
+              <input type="text" id="ledger-search-input" class="form-control" placeholder="Cari keterangan, nomor, tanggal...">
+            </div>
+            <button id="btn-ledger-filter" class="btn btn-secondary btn-sm">Filter</button>
+          </div>
+
+          <div class="header-actions">
+            <button id="btn-export-reservations" class="btn btn-secondary hidden">
+              Ekspor Excel (13 Kolom)
+            </button>
+            <button id="btn-clean-duplicates" class="btn btn-secondary">
+              Bersihkan Duplikat
+            </button>
+            <button id="btn-add-transaction" class="btn btn-primary">
+              + Tambah Transaksi
+            </button>
+          </div>
+        </div>
+
+        <div id="ledger-res-kpi-grid" class="kpi-grid hidden">
+          <div class="kpi-card">
+            <span class="kpi-label">Total Reservasi</span>
+            <div id="res-kpi-count" class="kpi-value">0</div>
+            <span id="res-kpi-rooms" class="kpi-subtext">0 Kamar Terjual</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Total Tamu (Pax)</span>
+            <div id="res-kpi-pax" class="kpi-value">0 Orang</div>
+            <span class="kpi-subtext">Akumulasi Total Person</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">Total Malam (Night)</span>
+            <div id="res-kpi-nights" class="kpi-value">0 Malam</div>
+            <span class="kpi-subtext">Akumulasi Lama Menginap</span>
+          </div>
+          <div class="kpi-card highlight-card">
+            <span class="kpi-label">Total Payment</span>
+            <div id="res-kpi-payment" class="kpi-value text-accent">Rp 0</div>
+            <span class="kpi-subtext">Total Pendapatan Reservasi</span>
+          </div>
+        </div>
+
+        <div class="table-section card">
+          <div class="card-header">
+            <h2 id="ledger-card-title" class="card-title">Daftar Transaksi Pendapatan</h2>
+            <span id="ledger-summary-info" class="card-subtitle">Total: 0 Data | Rp 0</span>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead id="ledger-table-head">
+                <tr>
+                  <th style="width: 70px;">ID</th>
+                  <th style="width: 110px;">Unit</th>
+                  <th style="width: 120px;">Tanggal</th>
+                  <th style="text-align: right; width: 170px;">Nominal (Rp)</th>
+                  <th>Keterangan</th>
+                  <th style="width: 180px;">Berkas Sumber</th>
+                  <th style="width: 110px; text-align: center;">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="ledger-table-body">
+                <tr>
+                  <td colspan="7" class="text-center text-muted">Memuat data transaksi...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination Bar -->
+          <div class="pagination-bar">
+            <div class="pagination-size">
+              <span>Baris per halaman:</span>
+              <select id="ledger-page-size" class="form-control form-control-sm">
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
+            <div class="pagination-info" id="ledger-page-info">
+              Halaman 1 dari 1 (0 data)
+            </div>
+            <div class="pagination-controls">
+              <button id="btn-ledger-prev" class="btn btn-secondary btn-sm" disabled>&lt; Sebelumnya</button>
+              <button id="btn-ledger-next" class="btn btn-secondary btn-sm" disabled>Selanjutnya &gt;</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- TAB 3: RIWAYAT & IMPOR BERKAS EXCEL                                 -->
+      <!-- =================================================================== -->
+      <section id="view-imports" class="module-view">
+        <div class="import-layout-grid">
+          <!-- Left: Upload Card -->
+          <div class="card config-card">
+            <h2 class="section-heading">Unggah Berkas Pendapatan</h2>
+            <div id="import-dropzone" class="dropzone" tabindex="0" role="button">
+              <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              <div class="dropzone-text">
+                <span class="dropzone-primary">Pilih atau seret berkas Excel</span>
+                <span class="dropzone-secondary">Mendukung format .xlsx, .xls, .xlsm</span>
+              </div>
+              <input type="file" id="import-hidden-input" accept=".xlsx,.xls,.xlsm" style="display: none;">
+            </div>
+            <div class="template-download-row mt-2">
+              <button type="button" id="btn-download-import-template" class="btn btn-secondary btn-sm btn-block">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                Unduh Template Excel (.xlsx)
+              </button>
+            </div>
+
+            <!-- Import Configuration Form -->
+            <form id="import-config-form" class="mt-4">
+              <div class="form-group">
+                <label for="import-target-unit" class="form-label">Target Unit Bisnis</label>
+                <select id="import-target-unit" class="form-control">
+                  <option value="auto">Deteksi Otomatis dari Berkas</option>
+                  <option value="Bungalows">Anda Bungalows</option>
+                  <option value="Restaurant">Anda Restaurant</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Mode Pengimporan Data</label>
+                <div class="radio-group">
+                  <label class="radio-label">
+                    <input type="radio" name="import-mode" value="replace_period" checked>
+                    <span><strong>Ganti Periode Bulan Terkait</strong> (Rekomendasi)</span>
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="import-mode" value="skip_duplicates">
+                    <span><strong>Lewati Baris Duplikat</strong> (Pertahankan data lama)</span>
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="import-mode" value="replace_all_unit">
+                    <span><strong>Tulis Ulang Seluruh Data Unit</strong> (Hapus semua data unit)</span>
+                  </label>
+                </div>
+              </div>
+
+              <div id="import-file-selected" class="file-info hidden">
+                <div class="file-info-header">
+                  <span id="import-file-name" class="file-name">-</span>
+                  <button id="btn-cancel-import-file" class="btn-link text-danger" type="button">Batalkan</button>
+                </div>
+
+                <div id="import-status-banner" class="import-status-banner">
+                  <span id="import-status-badge" class="status-badge active">Berkas Terverifikasi</span>
+                  <div id="import-warning-box" class="import-warning-box hidden"></div>
+                  <div id="import-duplicate-confirm-wrap" class="mt-2 hidden">
+                    <label class="radio-label" style="align-items: center; background: var(--warning-bg); padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid #fde68a;">
+                      <input type="checkbox" id="chk-duplicate-ack">
+                      <span style="font-size: 11.5px; font-weight: 600; color: var(--warning-text);">Saya memahami berkas ini duplikat &amp; setuju melanjutkan impor</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="file-meta-grid mt-2">
+                  <div class="meta-item">
+                    <span class="meta-label">Unit Terdeteksi</span>
+                    <span id="import-meta-unit" class="meta-value">-</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="meta-label">Periode Data</span>
+                    <span id="import-meta-period" class="meta-value text-accent">-</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="meta-label">Baris Valid</span>
+                    <span id="import-meta-count" class="meta-value">-</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="meta-label">Total Omset</span>
+                    <span id="import-meta-total" class="meta-value font-mono">-</span>
+                  </div>
+                </div>
+
+                <div id="import-existing-info" class="meta-hint mt-2 text-muted hidden"></div>
+                <div id="import-progress-box" class="import-progress-box hidden mt-2 text-center" style="padding: 8px; background: var(--bg-hover); border-radius: var(--radius-sm); font-size: 12px; font-weight: 600;">
+                  <span class="spinner-sm"></span> <span id="import-progress-text">Sedang memproses transaksi ke database...</span>
+                </div>
+
+                <button type="button" id="btn-execute-import" class="btn btn-primary btn-block mt-3">
+                  Mulai Proses Impor ke Database
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Right: Import History Table -->
+          <div class="card table-card">
+            <div class="card-header">
+              <h2 class="card-title">Riwayat Berkas Yang Diimpor</h2>
+              <span id="import-logs-count" class="card-subtitle">0 Berkas</span>
+            </div>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th style="width: 145px;">Waktu Impor</th>
+                    <th style="width: 95px;">Unit</th>
+                    <th>Nama Berkas Asli</th>
+                    <th style="width: 140px;">Periode Data</th>
+                    <th style="width: 80px; text-align: right;">Cacah</th>
+                    <th style="width: 140px; text-align: right;">Total Nominal</th>
+                  </tr>
+                </thead>
+                <tbody id="import-logs-body">
+                  <tr>
+                    <td colspan="6" class="text-center text-muted">Belum ada riwayat impor.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- TAB 4: AUDIT TARGET (SUBSET SUM SOLVER)                             -->
+      <!-- =================================================================== -->
+      <section id="view-optimizer" class="module-view">
+        <div class="optimizer-layout">
+          <!-- Left Sidebar Controls -->
+          <aside class="sidebar-panel">
+            <section class="card config-card">
+              <h2 class="section-heading">File Sumber Rekonsiliasi</h2>
+              <div id="optimizer-dropzone" class="dropzone" tabindex="0" role="button">
+                <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                <div class="dropzone-text">
+                  <span class="dropzone-primary">Seret berkas .xlsx ke sini</span>
+                  <span class="dropzone-secondary">atau klik untuk menelusuri</span>
+                </div>
+              </div>
+
+              <div id="optimizer-file-info" class="file-info hidden">
+                <div class="file-info-header">
+                  <span id="optimizer-file-name" class="file-name">-</span>
+                  <button id="btn-opt-change-file" class="btn-link" type="button">Ganti</button>
+                </div>
+                <div class="file-meta-grid">
+                  <div class="meta-item">
+                    <span class="meta-label">Lembar Kerja</span>
+                    <span id="opt-meta-sheet" class="meta-value">-</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="meta-label">Rentang Baris</span>
+                    <span id="opt-meta-range" class="meta-value">-</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="meta-label">Total Transaksi</span>
+                    <span id="opt-meta-count" class="meta-value">-</span>
+                  </div>
+                  <div class="meta-item">
+                    <span id="opt-meta-total-label" class="meta-label">Total Nominal</span>
+                    <span id="opt-meta-total" class="meta-value">-</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="card config-card">
+              <h2 class="section-heading">Parameter Target</h2>
+              <form id="optimizer-form">
+                <div class="form-group">
+                  <label for="opt-input-target" class="form-label">
+                    Target Nominal (Rp)
+                    <span id="opt-target-hint" class="form-label-hint">Otomatis 50%</span>
+                  </label>
+                  <div class="input-prefix-wrapper">
+                    <span class="input-prefix">Rp</span>
+                    <input type="number" id="opt-input-target" step="0.5" class="form-control" placeholder="0" required>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="opt-select-tolerance" class="form-label">Toleransi Selisih</label>
+                  <select id="opt-select-tolerance" class="form-control">
+                    <option value="0.5">Terkecil Mutlak (Rp 0,5)</option>
+                    <option value="10">Maksimal Rp 10</option>
+                    <option value="100" selected>Maksimal Rp 100</option>
+                    <option value="1000">Maksimal Rp 1.000</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="opt-select-trajectories" class="form-label">Kepadatan Pencarian</label>
+                  <select id="opt-select-trajectories" class="form-control">
+                    <option value="32">Cepat (32 Lintasan / &lt;5 ms)</option>
+                    <option value="64" selected>Standar (64 Lintasan / &lt;10 ms)</option>
+                    <option value="128">Mendalam (128 Lintasan / &lt;20 ms)</option>
+                  </select>
+                </div>
+
+                <button type="button" id="btn-run-solver" class="btn btn-primary btn-block" disabled>
+                  Jalankan Optimasi Solver
+                </button>
+                <button type="button" id="btn-regenerate" class="btn btn-secondary btn-block mt-2 hidden">
+                  Cari Variasi Kombinasi Lain
+                </button>
+              </form>
+            </section>
+          </aside>
+
+          <!-- Right Content Area -->
+          <div class="content-panel">
+            <div class="kpi-grid">
+              <div class="kpi-card">
+                <span class="kpi-label">Target Solver</span>
+                <div id="opt-kpi-target" class="kpi-value">Rp 0</div>
+                <span id="opt-kpi-formula" class="kpi-subtext">Formula: -</span>
+              </div>
+              <div class="kpi-card">
+                <span class="kpi-label">Total Terpilih</span>
+                <div id="opt-kpi-selected" class="kpi-value text-accent">Rp 0</div>
+                <span id="opt-kpi-count" class="kpi-subtext">0 dari 0 baris</span>
+              </div>
+              <div class="kpi-card">
+                <span class="kpi-label">Selisih Target</span>
+                <div id="opt-kpi-diff" class="kpi-value text-success">Rp 0</div>
+                <span id="opt-kpi-time" class="kpi-subtext">Waktu: 0 ms</span>
+              </div>
+            </div>
+
+            <div id="opt-conflict-warning" class="import-warning-box mt-4 hidden"></div>
+
+            <div class="card table-card mt-4">
+              <div class="card-header">
+                <div>
+                  <h2 class="card-title" id="opt-preview-card-title">Pratinjau Hasil Pembagian Kolom E &amp; F</h2>
+                  <p class="card-subtitle">Baris terpilih disusun kronologis sesuai tanggal</p>
+                </div>
+                <div class="header-actions">
+                  <button id="btn-export-excel" class="btn btn-primary" disabled>
+                    Tulis ke Kolom E &amp; F File Excel
+                  </button>
+                </div>
+              </div>
+
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr id="opt-preview-thead-tr">
+                      <th style="width: 80px;">Baris</th>
+                      <th style="width: 140px;" id="opt-th-date">Kolom E (Tanggal)</th>
+                      <th style="text-align: right; width: 180px;" id="opt-th-amount">Kolom F (Nominal)</th>
+                      <th>Keterangan Formula Target</th>
+                    </tr>
+                  </thead>
+                  <tbody id="opt-preview-body">
+                    <tr>
+                      <td colspan="4" class="text-center text-muted">Belum ada file yang dianalisis.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- TAB 5: PENDATAAN WISATAWAN (DINAS PARIWISATA - FORM 1)              -->
+      <!-- =================================================================== -->
+      <section id="view-tourism" class="module-view">
+        <div class="view-header-bar">
+          <div class="header-filters">
+            <label for="tourism-month-select" class="filter-label">Periode Bulan:</label>
+            <select id="tourism-month-select" class="form-control select-month">
+              <option value="">Memuat periode...</option>
+            </select>
+
+            <label for="tourism-room-capacity" class="filter-label">Jumlah Kamar:</label>
+            <input type="number" id="tourism-room-capacity" min="1" max="500" value="14" class="form-control input-room-cap">
+
+            <label for="tourism-acc-type" class="filter-label">Jenis Akomodasi:</label>
+            <select id="tourism-acc-type" class="form-control select-acc-type">
+              <option value="Hotel Bintang">Hotel Bintang</option>
+              <option value="Hotel Non Bintang" selected>Hotel Non Bintang</option>
+              <option value="Homestay">Homestay</option>
+            </select>
+
+            <button id="btn-refresh-tourism" class="btn btn-secondary btn-sm" title="Muat Ulang Data Form 1">
+              Segarkan
+            </button>
+          </div>
+        </div>
+
+        <!-- Identitas Header Blanko Form 1 -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">PENDATAAN WISATAWAN PER BULAN — DINAS PARIWISATA LOMBOK TENGAH</h2>
+              <span class="card-subtitle">Angka siap salin untuk mengisi seluruh kolom pada blanko resmi Form 1</span>
+            </div>
+            <span class="badge badge-period">RAHASIA · FORM 1</span>
+          </div>
+
+          <div class="form1-meta-grid">
+            <div class="meta-item">
+              <span class="meta-label">NAMA AKOMODASI</span>
+              <span id="t-acc-name" class="meta-value">-</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">JUMLAH KAMAR</span>
+              <span id="t-room-cap" class="meta-value font-mono">14 Kamar</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">BULAN / TAHUN</span>
+              <span id="t-period-label" class="meta-value text-accent">-</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">TINGKAT HUNIAN KAMAR</span>
+              <span id="t-occupancy-rate" class="meta-value font-mono">0%</span>
+            </div>
+          </div>
+
+          <div class="form1-acc-row mt-3">
+            <span class="meta-label mr-3">JENIS AKOMODASI:</span>
+            <span class="form1-check-item"><span id="t-chk-bintang" class="form1-check-box"></span> HOTEL BINTANG</span>
+            <span class="form1-check-item"><span id="t-chk-nonbintang" class="form1-check-box checked">✓</span> HOTEL NON BINTANG</span>
+            <span class="form1-check-item"><span id="t-chk-homestay" class="form1-check-box"></span> HOMESTAY</span>
+          </div>
+
+          <div class="kpi-grid mt-3 mb-0">
+            <div class="kpi-card">
+              <span class="kpi-label">Total Reservasi (Check-In)</span>
+              <div id="t-kpi-res" class="kpi-value">0</div>
+              <span class="kpi-subtext">Sumber data format 13 kolom</span>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">Total Wisatawan (Check-In)</span>
+              <div id="t-kpi-guests" class="kpi-value text-accent">0 Orang</div>
+              <span id="t-kpi-guests-split" class="kpi-subtext">Domestik: 0 | Mancanegara: 0</span>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">Total Kamar Terisi</span>
+              <div id="t-kpi-room-nights" class="kpi-value">0 Room-Night</div>
+              <span id="t-kpi-room-vacant" class="kpi-subtext">Vacant: 0 Room-Night</span>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">Total Tempat Tidur Terisi</span>
+              <div id="t-kpi-bed-nights" class="kpi-value">0 Bed-Night</div>
+              <span id="t-kpi-bed-co" class="kpi-subtext">Check Out (Bed): 0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabel 1: Pendataan Wisatawan 4 Minggu -->
+        <div class="table-section card mt-4">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">TABEL 1: REKAPITULASI MINGGUAN (MINGGU 1 s/d 4)</h2>
+              <span class="card-subtitle">Occupied/Vacant kamar &amp; tempat tidur dihitung dalam satuan room-night / bed-night per minggu</span>
+            </div>
+            <span id="t-days-badge" class="card-subtitle">-</span>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table form1-table">
+              <thead>
+                <tr>
+                  <th rowspan="2" class="w-col-week">No. / Periode Mingguan</th>
+                  <th colspan="2" class="text-center">Wisatawan Domestik</th>
+                  <th colspan="2" class="text-center">Wisatawan Mancanegara</th>
+                  <th colspan="2" class="text-center">Total Kamar</th>
+                  <th colspan="2" class="text-center">Total Tempat Tidur</th>
+                  <th rowspan="2" class="w-col-ket">Ket.</th>
+                </tr>
+                <tr>
+                  <th class="text-center">Check In</th>
+                  <th class="text-center">Check Out</th>
+                  <th class="text-center">Check In</th>
+                  <th class="text-center">Check Out</th>
+                  <th class="text-center">Occupied</th>
+                  <th class="text-center">Vacant</th>
+                  <th class="text-center">Check Out (Bed)</th>
+                  <th class="text-center">Occupied (Bed)</th>
+                </tr>
+              </thead>
+              <tbody id="tourism-weekly-body">
+                <tr><td colspan="10" class="text-center text-muted">Memuat data Form 1...</td></tr>
+              </tbody>
+              <tfoot id="tourism-weekly-foot"></tfoot>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tabel 2: Kunjungan Wisatawan Berdasarkan Negara / Daerah Asal (Top 10 Blanko Form 1) -->
+        <div class="table-section card mt-4">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">TABEL 2: KUNJUNGAN WISATAWAN BERDASARKAN NEGARA / DAERAH ASAL (TOP 10 FORM 1)</h2>
+              <span class="card-subtitle">Diurutkan berdasarkan jumlah wisatawan terbanyak (orang) untuk disalin ke 10 baris blanko</span>
+            </div>
+            <span id="t-origins-summary" class="card-subtitle">0 Negara | 0 Daerah</span>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table form1-table">
+              <thead>
+                <tr>
+                  <th rowspan="2" class="w-col-no text-center">No.</th>
+                  <th colspan="2" class="text-center">Mancanegara</th>
+                  <th colspan="2" class="text-center">Nusantara</th>
+                </tr>
+                <tr>
+                  <th>Negara Asal</th>
+                  <th class="w-col-count text-right">Jumlah (Orang)</th>
+                  <th>Daerah Asal</th>
+                  <th class="w-col-count text-right">Jumlah (Orang)</th>
+                </tr>
+              </thead>
+              <tbody id="tourism-origins-body">
+                <tr><td colspan="5" class="text-center text-muted">Memuat daftar negara &amp; daerah asal...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Panel Daftar Lengkap (> 10 Asal) -->
+        <div id="tourism-all-origins-card" class="card mt-4 hidden">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Daftar Lengkap Seluruh Negara / Daerah Asal (&gt; 10 Besar)</h2>
+              <span class="card-subtitle">Seluruh negara/daerah yang melampaui 10 baris di blanko cetak tetap tercatat lengkap di sini</span>
+            </div>
+          </div>
+          <div class="backup-actions-grid">
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th class="w-col-rank text-center">#</th>
+                    <th>Negara Asal (Mancanegara)</th>
+                    <th class="text-right">Orang</th>
+                    <th class="text-right">Reservasi</th>
+                  </tr>
+                </thead>
+                <tbody id="tourism-all-foreign-body"></tbody>
+              </table>
+            </div>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th class="w-col-rank text-center">#</th>
+                    <th>Daerah Asal (Nusantara)</th>
+                    <th class="text-right">Orang</th>
+                    <th class="text-right">Reservasi</th>
+                  </tr>
+                </thead>
+                <tbody id="tourism-all-domestic-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bagian Bawah: Rata-Rata Tinggal (Malam) -->
+        <div class="card mt-4">
+          <div class="form1-stay-row">
+            <div>
+              <span class="kpi-label">RATA-RATA TINGGAL (MALAM)</span>
+              <div id="t-avg-stay-value" class="kpi-value text-accent mt-1">0,00 Malam</div>
+            </div>
+            <div class="form1-stay-boxes">
+              <span class="form1-check-item"><span id="t-stay-box-1" class="form1-check-box"></span> 1-2 MALAM</span>
+              <span class="form1-check-item"><span id="t-stay-box-2" class="form1-check-box"></span> 3 MALAM</span>
+              <span class="form1-check-item"><span id="t-stay-box-3" class="form1-check-box"></span> &gt; 3 MALAM</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 3. Modals & Dialogs                                                       -->
+  <!-- ========================================================================= -->
+
+  <!-- Modal Tambah/Edit Transaksi -->
+  <div id="modal-transaction" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="modal-trans-title" class="modal-title">Tambah Transaksi Manual</h2>
+        <button type="button" class="btn-close-modal" data-close="modal-transaction">&times;</button>
+      </div>
+      <form id="form-transaction" class="modal-body">
+        <input type="hidden" id="trans-id" value="">
+        <div class="form-group">
+          <label for="trans-unit" class="form-label">Unit Bisnis</label>
+          <select id="trans-unit" class="form-control" required>
+            <option value="Bungalows">Anda Bungalows</option>
+            <option value="Restaurant">Anda Restaurant</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="trans-date" class="form-label">Tanggal Transaksi (YYYY-MM-DD)</label>
+          <input type="date" id="trans-date" class="form-control" required>
+        </div>
+
+        <div class="form-group">
+          <label for="trans-amount" class="form-label">Nominal Pendapatan (Rp)</label>
+          <input type="number" id="trans-amount" step="1" class="form-control" placeholder="0" required>
+        </div>
+
+        <div class="form-group">
+          <label for="trans-notes" class="form-label">Keterangan / Catatan (Opsional)</label>
+          <input type="text" id="trans-notes" class="form-control" placeholder="Contoh: Pembayaran tunai tamu kamar 02">
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="modal-transaction">Batal</button>
+          <button type="button" id="btn-save-transaction" class="btn btn-primary">Simpan Transaksi</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Edit Rincian Reservasi (13 Kolom - Khusus Admin) -->
+  <div id="modal-reservation" class="modal-backdrop hidden">
+    <div class="modal-card modal-large">
+      <div class="modal-header">
+        <h2 class="modal-title">Edit Rincian Reservasi (13 Kolom)</h2>
+        <button type="button" class="btn-close-modal" data-close="modal-reservation">&times;</button>
+      </div>
+      <form id="form-reservation" class="modal-body">
+        <input type="hidden" id="res-id" value="">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="res-date" class="form-label">DATE (Tanggal Pembukuan)</label>
+            <input type="date" id="res-date" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="res-guest-name" class="form-label">NAME (Nama Tamu)</label>
+            <input type="text" id="res-guest-name" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="res-person" class="form-label">Total person (Pax)</label>
+            <input type="number" id="res-person" min="1" step="1" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="res-booking" class="form-label">Booking Number</label>
+            <input type="text" id="res-booking" class="form-control" placeholder="-">
+          </div>
+          <div class="form-group">
+            <label for="res-nationality" class="form-label">Nationality / Daerah Asal</label>
+            <input type="text" id="res-nationality" list="nationality-options" class="form-control" placeholder="Pilih negara atau daerah (mis. Mataram, Australia)">
+            <datalist id="nationality-options"></datalist>
+          </div>
+          <div class="form-group">
+            <label for="res-room" class="form-label">Room Number</label>
+            <input type="text" id="res-room" class="form-control" placeholder="Contoh: 02">
+          </div>
+          <div class="form-group">
+            <label for="res-rooms" class="form-label">Total Kamar</label>
+            <input type="number" id="res-rooms" min="1" step="1" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="res-remarks" class="form-label">Remarks / Channel</label>
+            <input type="text" id="res-remarks" list="remarks-options" class="form-control" placeholder="Walk in, Booking.com, Agoda...">
+            <datalist id="remarks-options">
+              <option value="Walk in"></option>
+              <option value="Booking.com"></option>
+              <option value="Agoda"></option>
+              <option value="Expedia"></option>
+              <option value="Traveloka"></option>
+              <option value="Tiket"></option>
+              <option value="Direct"></option>
+            </datalist>
+          </div>
+          <div class="form-group">
+            <label for="res-checkin" class="form-label">Date Check In</label>
+            <input type="date" id="res-checkin" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="res-checkout" class="form-label">Date Check Out</label>
+            <input type="date" id="res-checkout" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="res-nights" class="form-label">Total Night (Otomatis)</label>
+            <input type="number" id="res-nights" class="form-control" readonly>
+          </div>
+          <div class="form-group">
+            <label for="res-rate" class="form-label">Rate per Kamar/Malam (Otomatis)</label>
+            <input type="number" id="res-rate" class="form-control" readonly>
+          </div>
+          <div class="form-group col-span-2">
+            <label for="res-payment" class="form-label">Total Payment (Rp)</label>
+            <input type="number" id="res-payment" min="0" step="1" class="form-control" required>
+          </div>
+          <div class="form-group col-span-2 modal-hint-text text-muted">
+            Perubahan data reservasi akan otomatis menyinkronkan Data Transaksi, Pajak 10%, dan Form 1 Pariwisata. Gunakan tombol <strong>Ekspor Excel (13 Kolom)</strong> untuk menyimpan salinan arsip <code>.xlsx</code> terbaru.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="modal-reservation">Batal</button>
+          <button type="button" id="btn-save-reservation" class="btn btn-primary">Simpan Perubahan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Pengaturan Sistem (Settings) -->
+  <div id="modal-settings" class="modal-backdrop hidden">
+    <div class="modal-card modal-large">
+      <div class="modal-header">
+        <h2 class="modal-title">Pengaturan Sistem &amp; Profil Usaha</h2>
+        <button type="button" class="btn-close-modal" data-close="modal-settings">&times;</button>
+      </div>
+
+      <!-- Settings Tabs -->
+      <div class="settings-tab-nav">
+        <button type="button" class="settings-tab active" data-stab="profile">Profil Usaha</button>
+        <button type="button" class="settings-tab" data-stab="storage">Penyimpanan &amp; Database</button>
+        <button type="button" class="settings-tab" data-stab="users">Kelola Pengguna</button>
+        <button type="button" class="settings-tab" data-stab="backup">Cadangan &amp; Pemulihan</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Settings Tab 1: Profile -->
+        <div id="stab-profile" class="settings-pane active">
+          <form id="form-settings-profile">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="set-biz-name" class="form-label">Nama Perusahaan / Usaha</label>
+                <input type="text" id="set-biz-name" class="form-control">
+              </div>
+              <div class="form-group">
+                <label for="set-npwpd" class="form-label">NPWPD Resmi</label>
+                <input type="text" id="set-npwpd" class="form-control">
+              </div>
+              <div class="form-group col-span-2">
+                <label for="set-biz-addr" class="form-label">Alamat Usaha</label>
+                <input type="text" id="set-biz-addr" class="form-control">
+              </div>
+              <div class="form-group">
+                <label for="set-sign-pos" class="form-label">Jabatan Penandatangan</label>
+                <input type="text" id="set-sign-pos" class="form-control">
+              </div>
+              <div class="form-group">
+                <label for="set-sign-name" class="form-label">Nama Penandatangan</label>
+                <input type="text" id="set-sign-name" class="form-control">
+              </div>
+              <div class="form-group">
+                <label for="set-officer-name" class="form-label">Nama Petugas Bapenda</label>
+                <input type="text" id="set-officer-name" class="form-control">
+              </div>
+              <div class="form-group">
+                <label for="set-officer-nip" class="form-label">NIP Petugas Bapenda</label>
+                <input type="text" id="set-officer-nip" class="form-control">
+              </div>
+            </div>
+            <button type="button" id="btn-save-profile-settings" class="btn btn-primary mt-3">
+              Simpan Profil Usaha
+            </button>
+          </form>
+        </div>
+
+        <!-- Settings Tab 2: Storage -->
+        <div id="stab-storage" class="settings-pane">
+          <div class="storage-info-grid">
+            <div class="meta-item">
+              <span class="meta-label">Lokasi Database SQLite</span>
+              <span id="st-db-path" class="meta-value font-mono">-</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Ukuran Database di Disk</span>
+              <span id="st-db-size" class="meta-value">-</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Lokasi Arsip Berkas Excel</span>
+              <span id="st-archive-dir" class="meta-value font-mono">-</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Ukuran Berkas Arsip</span>
+              <span id="st-archive-size" class="meta-value">-</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Total Transaksi Tersimpan</span>
+              <span id="st-total-records" class="meta-value">-</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Total Riwayat Berkas</span>
+              <span id="st-total-logs" class="meta-value">-</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings Tab 3: Users -->
+        <div id="stab-users" class="settings-pane">
+          <div class="users-management">
+            <div class="card-header pb-2">
+              <h3 class="card-title">Daftar Akun Pengguna</h3>
+              <button type="button" id="btn-show-add-user" class="btn btn-secondary btn-sm">+ Tambah Akun</button>
+            </div>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Username</th>
+                    <th>Nama Lengkap</th>
+                    <th>Peran</th>
+                    <th>Login Terakhir</th>
+                    <th style="width: 140px; text-align: center;">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="settings-users-body">
+                  <!-- Loaded dynamically -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Form Tambah User (Admin) -->
+            <div id="box-add-user" class="card mt-3 hidden">
+              <h4 class="card-title mb-2">Tambah Akun Baru</h4>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="new-u-username" class="form-label">Username</label>
+                  <input type="text" id="new-u-username" class="form-control" placeholder="staff2">
+                </div>
+                <div class="form-group">
+                  <label for="new-u-fullname" class="form-label">Nama Lengkap</label>
+                  <input type="text" id="new-u-fullname" class="form-control" placeholder="Staff Keuangan">
+                </div>
+                <div class="form-group">
+                  <label for="new-u-role" class="form-label">Peran</label>
+                  <select id="new-u-role" class="form-control">
+                    <option value="staff">Staff Pelaporan</option>
+                    <option value="admin">Administrator</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="new-u-pin" class="form-label">PIN (4-8 Digit Angka)</label>
+                  <input type="password" id="new-u-pin" class="form-control" placeholder="****">
+                </div>
+              </div>
+              <div class="mt-3">
+                <button type="button" id="btn-save-new-user" class="btn btn-primary btn-sm">Simpan Akun</button>
+                <button type="button" id="btn-cancel-add-user" class="btn btn-secondary btn-sm">Batal</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings Tab 4: Backup & Restore -->
+        <div id="stab-backup" class="settings-pane">
+          <div class="backup-actions-grid">
+            <div class="backup-card">
+              <h3>Cadangkan Database (Backup)</h3>
+              <p>Simpan salinan utuh database SQLite aktif ke berkas <code>.sqlite</code> di komputer Anda dengan verifikasi integritas instan.</p>
+              <button type="button" id="btn-backup-now" class="btn btn-primary mt-3">
+                Cadangkan Sekarang
+              </button>
+            </div>
+
+            <div class="backup-card">
+              <h3>Pulihkan Database (Restore)</h3>
+              <p>Pulihkan database dari cadangan berkas SQLite. Sistem akan membuat salinan darurat <code>.pre_restore.bak</code> secara otomatis sebelum pemulihan.</p>
+              <button type="button" id="btn-restore-now" class="btn btn-secondary mt-3">
+                Pilih Berkas Cadangan &amp; Pulihkan
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Pratinjau Cetak Formulir Resmi A4 Landscape -->
+  <div id="modal-print" class="modal-backdrop hidden print-backdrop">
+    <div class="print-container">
+      <div class="print-actions-toolbar no-print">
+        <label class="print-toolbar-toggle">
+          <input type="checkbox" id="chk-toggle-signatures">
+          <span>Sertakan Kolom Tanda Tangan</span>
+        </label>
+        <button type="button" id="btn-trigger-print" class="btn btn-primary">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 6 2 18 2 18 9" />
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+            <rect x="6" y="14" width="12" height="8" />
+          </svg>
+          Cetak ke Printer / Simpan PDF
+        </button>
+        <button type="button" class="btn btn-secondary" data-close="modal-print">Tutup</button>
+      </div>
+
+      <!-- Printable A4 Sheet -->
+      <div class="print-sheet" id="print-sheet">
+        <!-- Top Header: Document Badge, Title, Period Badge -->
+        <div class="p-header-top">
+          <div class="p-badge-doc" id="p-doc-number">No: ANDA-BGW/2026-09/CCC0</div>
+          <div class="p-header-center">
+            <h1 class="p-report-title" id="p-title-unit">LAPORAN PENDAPATAN BUNGALOWS</h1>
+            <div class="p-company-name"><u id="p-company-name">ANDA BUNGALOWS &amp; RESTAURANT</u></div>
+            <div class="p-company-meta">
+              NPWPD: <span id="p-npwpd-head">1206020001128</span> • <span id="p-company-address">Jalan Pariwisata Pantai Kuta, Kecamatan Pujut, Lombok Tengah, NTB</span> • <span id="p-company-contact">HP/WhatsApp: +62818-0578-3810</span>
+            </div>
+          </div>
+          <div class="p-badge-period" id="p-period-badge">Periode: September 2026</div>
+        </div>
+
+        <div class="p-header-divider"></div>
+
+        <!-- Meta Sub-header Row -->
+        <div class="p-meta-subline">
+          <div>
+            NPWPD: <strong id="p-npwpd-sub">1206020001128</strong> &nbsp;|&nbsp;
+            Bulan: <strong id="p-meta-month">September</strong> &nbsp;|&nbsp;
+            Tahun: <strong id="p-meta-year">2026</strong>
+          </div>
+          <div>Tarif Pajak Daerah: <strong id="p-tax-rate-inline">10%</strong></div>
+        </div>
+
+        <!-- Top 3 KPI Summary Cards -->
+        <div class="p-kpi-row">
+          <div class="p-kpi-box">
+            <div class="p-kpi-title">TOTAL PENDAPATAN KOTOR</div>
+            <div class="p-kpi-value" id="p-kpi-gross">Rp 0</div>
+          </div>
+          <div class="p-kpi-box">
+            <div id="p-kpi-tax-title" class="p-kpi-title">PAJAK TERUTANG (10%)</div>
+            <div class="p-kpi-value text-danger" id="p-kpi-tax">Rp 0</div>
+          </div>
+          <div class="p-kpi-box">
+            <div class="p-kpi-title">PENDAPATAN SETELAH PAJAK</div>
+            <div class="p-kpi-value text-success" id="p-kpi-net">Rp 0</div>
+          </div>
+        </div>
+
+        <!-- Statistical Summary Line -->
+        <div class="p-stats-grid">
+          <div class="p-stat-item">Jumlah Hari: <strong id="p-stat-days">30 Hari</strong></div>
+          <div class="p-stat-item">Hari Berpendapatan: <strong id="p-stat-active">30 Hari</strong></div>
+          <div class="p-stat-item">Hari Tanpa Pendapatan: <strong id="p-stat-zero">0 Hari</strong></div>
+          <div class="p-stat-item">Rata-rata per Hari: <strong id="p-stat-avg">Rp 0</strong></div>
+          <div class="p-stat-item">Pendapatan Tertinggi: <strong id="p-stat-max">Rp 0</strong></div>
+          <div class="p-stat-item">Pendapatan Terendah &gt; 0: <strong id="p-stat-min">Rp 0</strong></div>
+        </div>
+
+        <!-- Main Two-Column Layout -->
+        <div class="p-body-columns">
+          <!-- Left Column: Daily 1..31 Table -->
+          <div class="p-col-left">
+            <table class="p-table">
+              <thead>
+                <tr>
+                  <th style="width: 26px; text-align: center;">No.</th>
+                  <th style="width: 80px;">Tanggal</th>
+                  <th style="width: 58px;">Hari</th>
+                  <th style="width: 95px; text-align: right;">Pendapatan (Rp)</th>
+                  <th style="width: 105px; text-align: center;">Status</th>
+                  <th style="width: 98px; text-align: right;">Akumulasi (Rp)</th>
+                </tr>
+              </thead>
+              <tbody id="p-table-body">
+                <!-- Rows 1..31 -->
+              </tbody>
+              <tfoot id="p-table-foot">
+                <!-- TOTAL PERIODE & PAJAK 10% -->
+              </tfoot>
+            </table>
+          </div>
+
+          <!-- Right Column: Chart + Monthly Tax Summary + Signatures -->
+          <div class="p-col-right">
+            <!-- Box 1: Chart -->
+            <div class="p-card-box">
+              <div class="p-box-header">
+                <span>GRAFIK PENDAPATAN HARIAN</span>
+                <span id="p-chart-range-label" style="font-weight: 500; color: #4b5563;">1 - 30 September</span>
+              </div>
+              <div class="p-chart-wrap">
+                <svg id="p-svg-chart" class="p-svg-chart" viewBox="0 0 460 110" preserveAspectRatio="none">
+                  <!-- Rendered via JS -->
+                </svg>
+              </div>
+              <div class="p-chart-caption">*Grafik mengambil data langsung dari kolom Tanggal dan Pendapatan pada tabel laporan.</div>
+            </div>
+
+            <!-- Box 2: Ringkasan Pajak Bulanan -->
+            <div class="p-card-box mt-2">
+              <div class="p-box-header text-center">RINGKASAN PAJAK BULANAN</div>
+              <table class="p-summary-table">
+                <tbody>
+                  <tr>
+                    <td>Pendapatan Kotor</td>
+                    <td id="p-sum-gross" class="text-right font-mono">Rp 0</td>
+                  </tr>
+                  <tr>
+                    <td>Tarif Pajak</td>
+                    <td id="p-sum-tax-rate" class="text-right font-mono">10%</td>
+                  </tr>
+                  <tr>
+                    <td class="text-danger font-bold">Pajak yang Harus Dibayarkan</td>
+                    <td id="p-sum-tax" class="text-right font-mono text-danger font-bold">Rp 0</td>
+                  </tr>
+                  <tr>
+                    <td class="text-success font-bold">Pendapatan Setelah Pajak</td>
+                    <td id="p-sum-net" class="text-right font-mono text-success font-bold">Rp 0</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Box 3: Signatures (Tanda Tangan) - Toggleable -->
+            <div id="p-signatures-wrapper" class="p-signatures-wrapper mt-2 hidden">
+              <div class="p-tax-note">
+                Catatan: Pajak <span id="p-note-unit">Bungalows</span> dihitung <span id="p-note-tax-rate">10%</span> dari pendapatan kotor pada periode yang dipilih sesuai ketentuan perpajakan daerah Kabupaten Lombok Tengah.
+              </div>
+              <div class="p-sig-columns">
+                <div class="p-sig-col">
+                  <div>Mengetahui / Menyetujui,</div>
+                  <div class="font-bold">Petugas Pajak Daerah Bapenda</div>
+                  <div class="p-sig-space"></div>
+                  <div class="font-bold">( <span id="p-officer-name">............................................</span> )</div>
+                  <div id="p-officer-nip" class="text-muted">NIP. ........................................</div>
+                </div>
+                <div class="p-sig-col right">
+                  <div id="p-sig-date">Lombok Tengah, -</div>
+                  <div class="font-bold">Wajib Pajak / Pengelola</div>
+                  <div class="p-sig-space"></div>
+                  <div class="font-bold">( <span id="p-sign-name">Pimpinan / Pengelola</span> )</div>
+                  <div class="text-muted">Penanggung Jawab Usaha</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Modal Dialog / Alert / Confirm System (Universal In-DOM Dialog) -->
+  <div id="modal-app-dialog" class="modal-backdrop hidden" style="z-index: 9999;">
+    <div class="modal-card" style="max-width: 440px; margin: auto;">
+      <div class="modal-header">
+        <h2 id="app-dialog-title" class="modal-title">Pemberitahuan</h2>
+        <button type="button" id="app-dialog-close-btn" class="btn-close-modal">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 20px 24px;">
+        <div id="app-dialog-icon-container"></div>
+        <div id="app-dialog-message" style="white-space: pre-wrap; font-size: 13px; line-height: 1.55; color: var(--text-main);"></div>
+      </div>
+      <div class="modal-footer" id="app-dialog-footer" style="display: flex; justify-content: flex-end; gap: 8px; padding: 12px 24px; border-top: 1px solid var(--border-color); background-color: var(--bg-subtle);">
+        <button type="button" id="app-dialog-btn-cancel" class="btn btn-secondary hidden">Batal</button>
+        <button type="button" id="app-dialog-btn-confirm" class="btn btn-primary">OK</button>
+      </div>
+    </div>
+  </div>
+
+
+  <script src="app.js"></script>
+</body>
+</html>

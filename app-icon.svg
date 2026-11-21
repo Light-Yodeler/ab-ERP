@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1b5e20"/>
+      <stop offset="100%" stop-color="#0d3b13"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#81c784"/>
+      <stop offset="100%" stop-color="#4caf50"/>
+    </linearGradient>
+  </defs>
+  <!-- Background squircle -->
+  <rect x="32" y="32" width="448" height="448" rx="104" fill="url(#bg)"/>
+  
+  <!-- Subtle spreadsheet grid lines -->
+  <rect x="96" y="96" width="320" height="320" rx="24" fill="none" stroke="#2e7d32" stroke-width="8"/>
+  <line x1="96" y1="180" x2="416" y2="180" stroke="#2e7d32" stroke-width="6"/>
+  <line x1="96" y1="260" x2="416" y2="260" stroke="#2e7d32" stroke-width="6"/>
+  <line x1="96" y1="340" x2="416" y2="340" stroke="#2e7d32" stroke-width="6"/>
+  <line x1="230" y1="96" x2="230" y2="416" stroke="#2e7d32" stroke-width="6"/>
+
+  <!-- Stylized Sigma Symbol -->
+  <path d="M 180 140 L 320 140 L 255 240 L 320 340 L 180 340 L 180 305 L 265 305 L 220 240 L 265 175 L 180 175 Z" fill="#ffffff"/>
+  
+  <!-- Target crosshair badge -->
+  <circle cx="350" cy="350" r="64" fill="#1b5e20" stroke="#81c784" stroke-width="8"/>
+  <circle cx="350" cy="350" r="40" fill="none" stroke="#81c784" stroke-width="6"/>
+  <circle cx="350" cy="350" r="16" fill="#81c784"/>
+</svg>

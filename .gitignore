@@ -1,0 +1,49 @@
+# Node
+node_modules/
+dist/
+
+# Rust / Tauri
+src-tauri/target/
+
+# OS & Logs
+.DS_Store
+Thumbs.db
+*.log
+
+# Environment & Signing Secrets
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.crt
+*.cer
+*.mobileprovision
+
+# Databases, Backups & Local Archives
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.db
+*.db-wal
+*.db-shm
+*.bak
+arsip_excel/
+
+# Sensitive Reports & Spreadsheets
+*.xlsx
+*.xls
+*.xlsm
+*.csv
+
+# Local AI Agent Tools
+.claude/
+.omp/
+.opencode/
+
+# Tauri generated schemas
+src-tauri/gen/
