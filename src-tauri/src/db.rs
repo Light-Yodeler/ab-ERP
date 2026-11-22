@@ -276,6 +276,10 @@ pub fn init_db_with_migration(db_path: &Path, auto_migrate: bool) -> Result<Conn
             signer_title TEXT NOT NULL DEFAULT 'General Manager',
             paper_size TEXT NOT NULL DEFAULT 'F4' CHECK(paper_size IN ('F4', 'A4')),
             status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'revoked')),
+            department_code TEXT,
+            program_type_code TEXT,
+            issued_city TEXT,
+            body_template TEXT,
             created_by TEXT,
             created_at DATETIME DEFAULT (datetime('now', 'localtime')),
             updated_at DATETIME DEFAULT (datetime('now', 'localtime'))
@@ -283,13 +287,44 @@ pub fn init_db_with_migration(db_path: &Path, auto_migrate: bool) -> Result<Conn
 
         CREATE INDEX IF NOT EXISTS idx_cert_issued_date ON training_certificates(issued_date);
         CREATE INDEX IF NOT EXISTS idx_cert_status ON training_certificates(status);
-        CREATE INDEX IF NOT EXISTS idx_cert_recipient ON training_certificates(recipient_name);",
+        CREATE INDEX IF NOT EXISTS idx_cert_recipient ON training_certificates(recipient_name);
+
+        CREATE TABLE IF NOT EXISTS departments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            name TEXT NOT NULL,
+            program_description TEXT NOT NULL DEFAULT '',
+            competencies TEXT NOT NULL DEFAULT '',
+            is_active INTEGER NOT NULL DEFAULT 1,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME DEFAULT (datetime('now', 'localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS program_types (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            name TEXT NOT NULL,
+            default_duration_months INTEGER NOT NULL DEFAULT 3,
+            description TEXT NOT NULL DEFAULT '',
+            is_active INTEGER NOT NULL DEFAULT 1,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME DEFAULT (datetime('now', 'localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS certificate_sequences (
+            year INTEGER PRIMARY KEY,
+            last_seq INTEGER NOT NULL DEFAULT 0
+        );",
     )
     .map_err(|e| format!("Gagal membuat skema database: {}", e))?;
     // Auto-migration for existing databases
     let _ = conn.execute("ALTER TABLE import_logs ADD COLUMN period TEXT", []);
     let _ = conn.execute("ALTER TABLE import_logs ADD COLUMN file_hash TEXT", []);
     let _ = conn.execute("ALTER TABLE training_certificates ADD COLUMN achievement_text TEXT", []);
+    let _ = conn.execute("ALTER TABLE training_certificates ADD COLUMN department_code TEXT", []);
+    let _ = conn.execute("ALTER TABLE training_certificates ADD COLUMN program_type_code TEXT", []);
+    let _ = conn.execute("ALTER TABLE training_certificates ADD COLUMN issued_city TEXT", []);
+    let _ = conn.execute("ALTER TABLE training_certificates ADD COLUMN body_template TEXT", []);
     // Backfill period for legacy import_logs from transactions
     let _ = conn.execute(
         "UPDATE import_logs 
@@ -376,6 +411,8 @@ pub fn init_db_with_migration(db_path: &Path, auto_migrate: bool) -> Result<Conn
         ("certSignerTitle", "General Manager"),
         ("certProgramName", "hospitality training program"),
         ("certPaperSize", "F4"),
+        ("certIssuedCity", crate::certificate::DEFAULT_ISSUED_CITY),
+        ("certBodyTemplate", crate::certificate::DEFAULT_BODY_TEMPLATE),
         ("certShowSignature", "0"),
         ("certLogoFile", ""),
         ("certSignatureFile", ""),
@@ -399,6 +436,8 @@ pub fn init_db_with_migration(db_path: &Path, auto_migrate: bool) -> Result<Conn
 
     // Seed default users (admin & staff)
     let _ = seed_default_users(&conn);
+    // Seed initial hospitality departments and program types when empty
+    let _ = seed_default_catalog(&conn);
 
     Ok(conn)
 }
@@ -1322,6 +1361,10 @@ pub struct TrainingCertificateRow {
     pub signer_title: String,
     pub paper_size: String,
     pub status: String,
+    pub department_code: Option<String>,
+    pub program_type_code: Option<String>,
+    pub issued_city: Option<String>,
+    pub body_template: Option<String>,
     pub created_by: Option<String>,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
@@ -1344,6 +1387,14 @@ pub struct TrainingCertificateInput {
     pub signer_name: Option<String>,
     pub signer_title: Option<String>,
     pub paper_size: Option<String>,
+    #[serde(default)]
+    pub department_code: Option<String>,
+    #[serde(default)]
+    pub program_type_code: Option<String>,
+    #[serde(default)]
+    pub issued_city: Option<String>,
+    #[serde(default)]
+    pub body_template: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1357,6 +1408,52 @@ pub struct PaginatedCertificates {
     pub total_pages: usize,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DepartmentRow {
+    pub id: i64,
+    pub code: String,
+    pub name: String,
+    pub program_description: String,
+    pub competencies: String,
+    pub is_active: bool,
+    pub sort_order: i64,
+    pub created_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DepartmentInput {
+    pub id: Option<i64>,
+    pub code: String,
+    pub name: String,
+    pub program_description: String,
+    pub competencies: String,
+    pub is_active: Option<bool>,
+    pub sort_order: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProgramTypeRow {
+    pub id: i64,
+    pub code: String,
+    pub name: String,
+    pub default_duration_months: i64,
+    pub description: String,
+    pub is_active: bool,
+    pub sort_order: i64,
+    pub created_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProgramTypeInput {
+    pub id: Option<i64>,
+    pub code: String,
+    pub name: String,
+    pub default_duration_months: i64,
+    pub description: String,
+    pub is_active: Option<bool>,
+    pub sort_order: Option<i64>,
+}
+
 struct ResolvedCertificateFields {
     recipient_name: String,
     duration_text: String,
@@ -1365,7 +1462,12 @@ struct ResolvedCertificateFields {
     end_iso: String,
     issued_iso: String,
     issued_year: i32,
+    issued_month: u32,
     department: Option<String>,
+    department_code: Option<String>,
+    program_type_code: Option<String>,
+    issued_city: Option<String>,
+    body_template: Option<String>,
     institution: Option<String>,
     achievement_text: Option<String>,
     notes: Option<String>,
@@ -1374,14 +1476,199 @@ struct ResolvedCertificateFields {
     paper_size: String,
 }
 
+fn sanitize_catalog_code(raw: &str) -> Result<String, String> {
+    let cleaned: String = raw
+        .trim()
+        .to_ascii_uppercase()
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+        .take(12)
+        .collect();
+    if cleaned.is_empty() {
+        return Err("Kode tidak boleh kosong dan hanya boleh berisi huruf/angka/tanda hubung.".to_string());
+    }
+    Ok(cleaned)
+}
+
+fn sanitize_optional_dept_code(code: Option<&str>) -> Option<String> {
+    let raw = code?.trim();
+    if raw.is_empty() || raw == "-" {
+        return None;
+    }
+    let cleaned: String = raw
+        .to_ascii_uppercase()
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+        .take(12)
+        .collect();
+    if cleaned.is_empty() {
+        None
+    } else {
+        Some(cleaned)
+    }
+}
+
+fn strip_department_suffix(segment: &str) -> String {
+    let without_paren = if segment.ends_with(')') {
+        if let Some(open_idx) = segment.rfind('(') {
+            segment[..open_idx].trim()
+        } else {
+            segment.trim()
+        }
+    } else {
+        segment.trim()
+    };
+    let lower = without_paren.to_ascii_lowercase();
+    if let Some(stripped) = lower.strip_suffix(" department") {
+        let end = stripped.len();
+        without_paren[..end].trim().to_string()
+    } else {
+        without_paren.to_string()
+    }
+}
+
+fn resolve_department_code(
+    conn: &Connection,
+    explicit_code: Option<&str>,
+    division_text: Option<&str>,
+) -> Option<String> {
+    if let Some(code) = sanitize_optional_dept_code(explicit_code) {
+        return Some(code);
+    }
+    let divs: Vec<&str> = division_text?
+        .split(';')
+        .map(str::trim)
+        .filter(|s| !s.is_empty() && *s != "-")
+        .collect();
+    if divs.is_empty() {
+        return None;
+    }
+    if divs.len() >= 2 {
+        return Some("ROT".to_string());
+    }
+    let first_div = divs[0];
+    let base_name = strip_department_suffix(first_div);
+    conn.query_row(
+        "SELECT code FROM departments
+         WHERE LOWER(name) = LOWER(?1) OR LOWER(code) = LOWER(?2)
+         LIMIT 1",
+        params![base_name, first_div],
+        |r| r.get::<_, String>(0),
+    )
+    .ok()
+    .and_then(|c| sanitize_optional_dept_code(Some(&c)))
+}
+
+fn parse_duration_to_months(raw: &str) -> Option<f64> {
+    let text = raw.trim().to_ascii_lowercase();
+    if text.is_empty() {
+        return None;
+    }
+    let mut parts = text.split(|c: char| c.is_whitespace() || c == '-').filter(|s| !s.is_empty());
+    let num_tok = parts.next()?;
+    let unit_tok = parts
+        .next()?
+        .trim_end_matches(|c: char| matches!(c, '.' | ',' | ';' | ')'));
+
+    let num = match num_tok {
+        "one" => 1.0,
+        "two" => 2.0,
+        "three" => 3.0,
+        "four" => 4.0,
+        "five" => 5.0,
+        "six" => 6.0,
+        "seven" => 7.0,
+        "eight" => 8.0,
+        "nine" => 9.0,
+        "ten" => 10.0,
+        "eleven" => 11.0,
+        "twelve" => 12.0,
+        other => other.replace(',', ".").parse::<f64>().ok()?,
+    };
+    if !num.is_finite() || num <= 0.0 {
+        return None;
+    }
+
+    match unit_tok {
+        "year" | "years" | "yr" | "yrs" | "tahun" | "thn" => Some(num * 12.0),
+        "month" | "months" | "mo" | "mos" | "bulan" | "bln" => Some(num),
+        "week" | "weeks" | "wk" | "wks" | "minggu" | "mgg" => Some(num / 4.33),
+        "day" | "days" | "hari" => Some(num / 30.0),
+        _ => None,
+    }
+}
+
+fn format_months_summary(val: f64) -> String {
+    let rounded = (val * 10.0).round() / 10.0;
+    if (rounded - rounded.round()).abs() < 0.05 {
+        format!("{} bulan", rounded.round() as i64)
+    } else {
+        format!("{:.1} bulan", rounded)
+    }
+}
+
+fn validate_division_durations(
+    department: Option<&str>,
+    start_d: chrono::NaiveDate,
+    end_d: chrono::NaiveDate,
+    duration_text: &str,
+) -> Result<(), String> {
+    let Some(raw_dept) = department else {
+        return Ok(());
+    };
+    let mut sum_months = 0.0_f64;
+    let mut parsed_count = 0usize;
+
+    for seg in raw_dept.split(';').map(str::trim).filter(|s| !s.is_empty() && *s != "-") {
+        if let Some(without_close) = seg.strip_suffix(')') {
+            let mut depth = 1_usize;
+            let mut open_idx = None;
+            for (idx, ch) in without_close.char_indices().rev() {
+                if ch == ')' {
+                    depth += 1;
+                } else if ch == '(' {
+                    depth -= 1;
+                    if depth == 0 {
+                        open_idx = Some(idx);
+                        break;
+                    }
+                }
+            }
+            if let Some(open_pos) = open_idx.or_else(|| without_close.rfind('(')) {
+                let inner = without_close[open_pos + 1..].trim();
+                if let Some(months) = parse_duration_to_months(inner) {
+                    sum_months += months;
+                    parsed_count += 1;
+                }
+            }
+        }
+    }
+    if parsed_count == 0 {
+        return Ok(());
+    }
+
+    let period_months = parse_duration_to_months(duration_text)
+        .unwrap_or_else(|| ((end_d - start_d).num_days().max(1) as f64) / 30.4375);
+
+    if sum_months > period_months + 0.35 {
+        return Err(format!(
+            "Total durasi divisi ({}) melebihi periode utama ({}). Sesuaikan durasi per divisi atau rentang tanggal pelatihan.",
+            format_months_summary(sum_months),
+            format_months_summary(period_months)
+        ));
+    }
+    Ok(())
+}
+
 fn resolve_certificate_fields(
     conn: &Connection,
     input: &TrainingCertificateInput,
 ) -> Result<ResolvedCertificateFields, String> {
-    let recipient_name = input.recipient_name.trim();
-    if recipient_name.is_empty() {
+    let raw_recipient = input.recipient_name.trim();
+    if raw_recipient.is_empty() {
         return Err("Nama penerima sertifikat wajib diisi.".to_string());
     }
+    let recipient_name = crate::certificate::normalize_recipient_name(raw_recipient);
     let duration_text = input.duration_text.trim();
     if duration_text.is_empty() {
         return Err("Durasi pelatihan wajib diisi.".to_string());
@@ -1415,16 +1702,37 @@ fn resolve_certificate_fields(
     let default_signer = setting_or("certSignerName", "Agus Sumardi Wijaya");
     let default_title = setting_or("certSignerTitle", "General Manager");
     let default_paper = setting_or("certPaperSize", "F4");
+    let default_city = setting_or("certIssuedCity", crate::certificate::DEFAULT_ISSUED_CITY);
+    let default_template = setting_or(
+        "certBodyTemplate",
+        crate::certificate::DEFAULT_BODY_TEMPLATE,
+    );
+
+    let department = clean_optional_field(&input.department);
+    validate_division_durations(department.as_deref(), start_d, end_d, duration_text)?;
+    let department_code = resolve_department_code(
+        conn,
+        input.department_code.as_deref(),
+        department.as_deref(),
+    );
+    let program_type_code = sanitize_optional_dept_code(input.program_type_code.as_deref());
+    let issued_city = clean_optional_field(&input.issued_city).or(Some(default_city));
+    let body_template = clean_optional_field(&input.body_template).or(Some(default_template));
 
     Ok(ResolvedCertificateFields {
-        recipient_name: recipient_name.to_string(),
+        recipient_name,
         duration_text: duration_text.to_string(),
         program_name: clean_or_default(&input.program_name, &default_program),
         start_iso,
         end_iso,
         issued_iso,
         issued_year: chrono::Datelike::year(&issued_d),
-        department: clean_optional_field(&input.department),
+        issued_month: chrono::Datelike::month(&issued_d),
+        department,
+        department_code,
+        program_type_code,
+        issued_city,
+        body_template,
         institution: clean_optional_field(&input.institution),
         achievement_text: clean_optional_field(&input.achievement_text),
         notes: clean_optional_field(&input.notes),
@@ -1484,14 +1792,67 @@ fn map_certificate_row(r: &rusqlite::Row) -> rusqlite::Result<TrainingCertificat
         signer_title: r.get(13)?,
         paper_size: r.get(14)?,
         status: r.get(15)?,
-        created_by: r.get(16)?,
-        created_at: r.get(17)?,
-        updated_at: r.get(18)?,
+        department_code: r.get(16)?,
+        program_type_code: r.get(17)?,
+        issued_city: r.get(18)?,
+        body_template: r.get(19)?,
+        created_by: r.get(20)?,
+        created_at: r.get(21)?,
+        updated_at: r.get(22)?,
     })
 }
 
-/// Computes the next available sequential `NNN/ABR/YYYY` certificate number for `year`.
-pub fn get_next_certificate_number(conn: &Connection, year: i32) -> Result<String, String> {
+/// Converts a calendar month (1..=12) into uppercase Roman numerals for certificate numbering.
+pub fn month_to_roman(month: u32) -> &'static str {
+    match month {
+        1 => "I",
+        2 => "II",
+        3 => "III",
+        4 => "IV",
+        5 => "V",
+        6 => "VI",
+        7 => "VII",
+        8 => "VIII",
+        9 => "IX",
+        10 => "X",
+        11 => "XI",
+        12 => "XII",
+        _ => "I",
+    }
+}
+
+fn format_certificate_no(seq: u32, dept_code: Option<&str>, month: u32, year: i32) -> String {
+    let roman = month_to_roman(month);
+    match sanitize_optional_dept_code(dept_code) {
+        Some(code) => format!("{:03}/ABR-{}/{}/{}", seq, code, roman, year),
+        None => format!("{:03}/ABR/{}/{}", seq, roman, year),
+    }
+}
+
+fn parse_seq_and_year_from_cert_no(cert_no: &str) -> Option<(u32, i32)> {
+    let parts: Vec<&str> = cert_no.split('/').map(str::trim).collect();
+    if parts.len() < 3 {
+        return None;
+    }
+    let first = parts.first()?.parse::<u32>().ok()?;
+    if first == 0 || first > 999_999 {
+        return None;
+    }
+    let last = parts.last()?.parse::<i32>().ok()?;
+    Some((first, last))
+}
+
+fn compute_next_sequence(conn: &Connection, year: i32) -> Result<u32, String> {
+    let seq_table_val: u32 = conn
+        .query_row(
+            "SELECT last_seq FROM certificate_sequences WHERE year = ?1",
+            params![year],
+            |r| r.get::<_, i64>(0),
+        )
+        .ok()
+        .and_then(|v| u32::try_from(v).ok())
+        .unwrap_or(0);
+
     let pattern = format!("%/{}", year);
     let mut stmt = conn
         .prepare("SELECT certificate_no FROM training_certificates WHERE certificate_no LIKE ?1")
@@ -1500,18 +1861,39 @@ pub fn get_next_certificate_number(conn: &Connection, year: i32) -> Result<Strin
         .query_map(params![pattern], |r| r.get::<_, String>(0))
         .map_err(|e| format!("Gagal memindai nomor sertifikat: {}", e))?;
 
-    let mut max_seq: u32 = 0;
+    let mut max_seq = seq_table_val;
     for res in rows {
         let cert_no = res.map_err(|e| e.to_string())?;
-        if let Some(first_seg) = cert_no.split('/').next() {
-            if let Ok(num) = first_seg.trim().parse::<u32>() {
-                if num > max_seq {
-                    max_seq = num;
-                }
+        if let Some((num, parsed_year)) = parse_seq_and_year_from_cert_no(&cert_no) {
+            if parsed_year == year && num > max_seq {
+                max_seq = num;
             }
         }
     }
-    Ok(format!("{:03}/ABR/{}", max_seq + 1, year))
+    max_seq
+        .checked_add(1)
+        .ok_or_else(|| "Urutan nomor sertifikat melampaui batas maksimum.".to_string())
+}
+
+fn upsert_sequence_high_water(conn: &Connection, year: i32, seq: u32) -> Result<(), String> {
+    conn.execute(
+        "INSERT INTO certificate_sequences (year, last_seq) VALUES (?1, ?2)
+         ON CONFLICT(year) DO UPDATE SET last_seq = MAX(certificate_sequences.last_seq, excluded.last_seq)",
+        params![year, i64::from(seq)],
+    )
+    .map_err(|e| format!("Gagal memperbarui urutan sertifikat: {}", e))?;
+    Ok(())
+}
+
+/// Computes the next available `NNN/ABR-{DEPT}/{ROMAN}/{YYYY}` certificate number for preview.
+pub fn get_next_certificate_number(
+    conn: &Connection,
+    year: i32,
+    month: u32,
+    dept_code: Option<&str>,
+) -> Result<String, String> {
+    let next_seq = compute_next_sequence(conn, year)?;
+    Ok(format_certificate_no(next_seq, dept_code, month, year))
 }
 
 /// Fetches a single training certificate record by primary key ID.
@@ -1519,7 +1901,9 @@ pub fn get_certificate_by_id(conn: &Connection, id: i64) -> Result<TrainingCerti
     conn.query_row(
         "SELECT id, certificate_no, recipient_name, duration_text, program_name,
                 start_date, end_date, issued_date, department, institution, achievement_text, notes,
-                signer_name, signer_title, paper_size, status, created_by, created_at, updated_at
+                signer_name, signer_title, paper_size, status,
+                department_code, program_type_code, issued_city, body_template,
+                created_by, created_at, updated_at
          FROM training_certificates WHERE id = ?1",
         params![id],
         map_certificate_row,
@@ -1530,30 +1914,50 @@ pub fn get_certificate_by_id(conn: &Connection, id: i64) -> Result<TrainingCerti
     })
 }
 
-/// Validates input fields and creates a new training certificate record in SQLite.
+/// Validates input fields and creates a new training certificate record in SQLite atomically.
 pub fn create_certificate(
     conn: &Connection,
     input: &TrainingCertificateInput,
     created_by: Option<&str>,
 ) -> Result<TrainingCertificateRow, String> {
-    let fields = resolve_certificate_fields(conn, input)?;
+    let tx = conn
+        .unchecked_transaction()
+        .map_err(|e| format!("Gagal memulai transaksi sertifikat: {}", e))?;
+
+    let fields = resolve_certificate_fields(&tx, input)?;
     let certificate_no = match input
         .certificate_no
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
     {
-        Some(manual) => manual.to_string(),
-        None => get_next_certificate_number(conn, fields.issued_year)?,
+        Some(manual) => {
+            if let Some((seq, yr)) = parse_seq_and_year_from_cert_no(manual) {
+                if yr >= 1900 && yr <= 9999 {
+                    upsert_sequence_high_water(&tx, yr, seq)?;
+                }
+            }
+            manual.to_string()
+        }
+        None => {
+            let next_seq = compute_next_sequence(&tx, fields.issued_year)?;
+            upsert_sequence_high_water(&tx, fields.issued_year, next_seq)?;
+            format_certificate_no(
+                next_seq,
+                fields.department_code.as_deref(),
+                fields.issued_month,
+                fields.issued_year,
+            )
+        }
     };
     let creator = created_by.map(str::trim).filter(|s| !s.is_empty());
 
-    conn.execute(
+    tx.execute(
         "INSERT INTO training_certificates
          (certificate_no, recipient_name, duration_text, program_name, start_date, end_date,
           issued_date, department, institution, achievement_text, notes, signer_name, signer_title,
-          paper_size, status, created_by)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, 'active', ?15)",
+          paper_size, status, department_code, program_type_code, issued_city, body_template, created_by)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, 'active', ?15, ?16, ?17, ?18, ?19)",
         params![
             certificate_no,
             fields.recipient_name,
@@ -1569,49 +1973,81 @@ pub fn create_certificate(
             fields.signer_name,
             fields.signer_title,
             fields.paper_size,
+            fields.department_code,
+            fields.program_type_code,
+            fields.issued_city,
+            fields.body_template,
             creator,
         ],
     )
     .map_err(|e| map_cert_db_error(e, &certificate_no, "menyimpan sertifikat"))?;
 
-    get_certificate_by_id(conn, conn.last_insert_rowid())
+    let inserted_id = tx.last_insert_rowid();
+    tx.commit()
+        .map_err(|e| format!("Gagal mengesahkan transaksi sertifikat: {}", e))?;
+
+    get_certificate_by_id(conn, inserted_id)
 }
 
 /// Validates input fields and updates an existing training certificate record.
+/// Certificate numbers are permanently locked after issuance and cannot be modified on update.
 pub fn update_certificate(
     conn: &Connection,
     id: i64,
     input: &TrainingCertificateInput,
 ) -> Result<TrainingCertificateRow, String> {
-    let certificate_no = input
-        .certificate_no
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .ok_or_else(|| "Nomor sertifikat wajib diisi.".to_string())?;
+    let existing_no: String = conn
+        .query_row(
+            "SELECT certificate_no FROM training_certificates WHERE id = ?1",
+            params![id],
+            |r| r.get(0),
+        )
+        .map_err(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => "Data sertifikat tidak ditemukan.".to_string(),
+            other => format!("Gagal membaca data sertifikat: {}", other),
+        })?;
+
+    if let Some(raw_no) = input.certificate_no.as_deref() {
+        let req_no = raw_no.trim();
+        if req_no.is_empty() {
+            return Err(
+                "Nomor sertifikat sudah terkunci setelah diterbitkan dan tidak dapat dikosongkan."
+                    .to_string(),
+            );
+        }
+        if !existing_no.eq_ignore_ascii_case(req_no) {
+            return Err(format!(
+                "Nomor sertifikat '{}' sudah terkunci setelah diterbitkan dan tidak dapat diubah.",
+                existing_no
+            ));
+        }
+    }
+
     let fields = resolve_certificate_fields(conn, input)?;
 
     let affected = conn
         .execute(
             "UPDATE training_certificates
-             SET certificate_no = ?1,
-                 recipient_name = ?2,
-                 duration_text = ?3,
-                 program_name = ?4,
-                 start_date = ?5,
-                 end_date = ?6,
-                 issued_date = ?7,
-                 department = ?8,
-                 institution = ?9,
-                 achievement_text = ?10,
-                 notes = ?11,
-                 signer_name = ?12,
-                 signer_title = ?13,
-                 paper_size = ?14,
+             SET recipient_name = ?1,
+                 duration_text = ?2,
+                 program_name = ?3,
+                 start_date = ?4,
+                 end_date = ?5,
+                 issued_date = ?6,
+                 department = ?7,
+                 institution = ?8,
+                 achievement_text = ?9,
+                 notes = ?10,
+                 signer_name = ?11,
+                 signer_title = ?12,
+                 paper_size = ?13,
+                 department_code = ?14,
+                 program_type_code = ?15,
+                 issued_city = ?16,
+                 body_template = ?17,
                  updated_at = datetime('now', 'localtime')
-             WHERE id = ?15",
+             WHERE id = ?18",
             params![
-                certificate_no,
                 fields.recipient_name,
                 fields.duration_text,
                 fields.program_name,
@@ -1625,10 +2061,14 @@ pub fn update_certificate(
                 fields.signer_name,
                 fields.signer_title,
                 fields.paper_size,
+                fields.department_code,
+                fields.program_type_code,
+                fields.issued_city,
+                fields.body_template,
                 id,
             ],
         )
-        .map_err(|e| map_cert_db_error(e, certificate_no, "memperbarui sertifikat"))?;
+        .map_err(|e| map_cert_db_error(e, &existing_no, "memperbarui sertifikat"))?;
 
     if affected == 0 {
         return Err("Data sertifikat tidak ditemukan.".to_string());
@@ -1743,7 +2183,9 @@ pub fn get_paginated_certificates(
     let items_sql = format!(
         "SELECT id, certificate_no, recipient_name, duration_text, program_name,
                 start_date, end_date, issued_date, department, institution, achievement_text, notes,
-                signer_name, signer_title, paper_size, status, created_by, created_at, updated_at
+                signer_name, signer_title, paper_size, status,
+                department_code, program_type_code, issued_city, body_template,
+                created_by, created_at, updated_at
          FROM training_certificates {}
          ORDER BY issued_date DESC, id DESC
          LIMIT ?{} OFFSET ?{}",
@@ -1796,4 +2238,408 @@ pub fn get_certificate_years(conn: &Connection) -> Result<Vec<String>, String> {
         }
     }
     Ok(years)
+}
+
+fn seed_default_catalog(conn: &Connection) -> Result<(), String> {
+    let canonical_departments: [(&str, &str, &str, &str, &str, &[&str], i64); 10] = [
+        (
+            "KIT",
+            "Kitchen",
+            "The program covered food preparation, kitchen hygiene, and menu production.",
+            "Basic cooking techniques\nFood safety (HACCP)\nIngredient handling\nFood plating",
+            "Training in food preparation, kitchen hygiene, and menu production",
+            &[
+                "Teknik memasak dasar\nFood safety (HACCP)\nPenanganan bahan\nPlating",
+                "Basic cooking techniques\nFood safety (HACCP)\nIngredient handling\nPlating and presentation",
+            ],
+            10_i64,
+        ),
+        (
+            "FB",
+            "Food & Beverage Service",
+            "The program covered restaurant service, guest handling, and table setup.",
+            "Table service\nMenu knowledge\nGuest complaint handling\nUpselling techniques",
+            "Training in restaurant service, guest handling, and table setup",
+            &["Table service\nPengetahuan menu\nPenanganan keluhan\nUpselling"],
+            20,
+        ),
+        (
+            "BAR",
+            "Bar",
+            "The program covered beverage preparation and bar operations.",
+            "Beverage preparation\nProduct knowledge\nBar inventory control",
+            "Training in beverage preparation and bar operations",
+            &["Pembuatan minuman\nPengetahuan produk\nKontrol stok bar"],
+            30,
+        ),
+        (
+            "FO",
+            "Front Office",
+            "The program covered guest reception, reservations, and check-in/check-out procedures.",
+            "Guest registration\nReservation systems\nGuest communication\nPayment handling",
+            "Training in guest reception, reservations, and check-in/check-out procedures",
+            &["Registrasi tamu\nSistem reservasi\nKomunikasi tamu\nPenanganan pembayaran"],
+            40,
+        ),
+        (
+            "HK",
+            "Housekeeping",
+            "The program covered room preparation, cleanliness standards, and laundry operations.",
+            "Room cleanliness standards\nBed making\nLinen handling\nPublic area maintenance",
+            "Training in room preparation, cleanliness standards, and laundry operations",
+            &["Standar kebersihan kamar\nBed making\nPenanganan linen\nArea publik"],
+            50,
+        ),
+        (
+            "MNT",
+            "Maintenance / Engineering",
+            "The program covered facility upkeep and basic technical repairs.",
+            "Electrical maintenance\nPlumbing repairs\nAir conditioning maintenance\nPool & garden upkeep",
+            "Training in facility upkeep and basic technical repairs",
+            &[
+                "Perawatan listrik\nPlumbing\nPerawatan AC\nTaman dan kolam",
+                "Electrical maintenance\nPlumbing repairs\nAir conditioning maintenance\nGarden and pool upkeep",
+            ],
+            60,
+        ),
+        (
+            "SM",
+            "Sales & Marketing",
+            "The program covered promotional campaigns, online booking channels, and guest engagement.",
+            "Social media management\nOTA channel management (Booking.com, Agoda)\nGuest inquiry handling",
+            "Training in promotion, online booking channels, and guest engagement",
+            &["Media sosial\nOTA (Booking.com, Agoda)\nPenanganan inquiry"],
+            70,
+        ),
+        (
+            "ADM",
+            "Administration / Accounting",
+            "The program covered hotel administration, cashiering, and basic bookkeeping.",
+            "Transaction recording\nInvoicing\nDaily financial reporting",
+            "Training in hotel administration, cashiering, and basic bookkeeping",
+            &["Pencatatan transaksi\nInvoice\nLaporan harian"],
+            80,
+        ),
+        (
+            "SEC",
+            "Security",
+            "The program covered guest safety, emergency response, and property security procedures.",
+            "Property patrols\nEmergency procedures\nAccess control",
+            "Training in guest and property safety procedures",
+            &["Patroli\nProsedur darurat\nKontrol akses"],
+            90,
+        ),
+        (
+            "SPA",
+            "Spa & Recreation",
+            "The program covered spa treatments and guest activity coordination.",
+            "Spa treatment techniques\nEquipment sanitation\nGuest activity coordination",
+            "Training in spa treatments and guest activity coordination",
+            &["Teknik perawatan\nKebersihan alat\nKoordinasi aktivitas"],
+            100,
+        ),
+    ];
+
+    let dept_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM departments", [], |r| r.get(0))
+        .unwrap_or(0);
+    if dept_count == 0 {
+        for (code, name, desc, comp, _, _, sort_order) in canonical_departments {
+            let _ = conn.execute(
+                "INSERT INTO departments (code, name, program_description, competencies, is_active, sort_order)
+                 VALUES (?1, ?2, ?3, ?4, 1, ?5)",
+                params![code, name, desc, comp, sort_order],
+            );
+        }
+    } else {
+        // Upgrade only unmodified earlier seed copies while leaving custom user edits intact
+        for (code, _, desc, comp, legacy_desc, legacy_comps, _) in canonical_departments {
+            let _ = conn.execute(
+                "UPDATE departments SET program_description = ?1
+                 WHERE UPPER(code) = ?2 AND program_description = ?3",
+                params![desc, code, legacy_desc],
+            );
+            for legacy_comp in legacy_comps {
+                let _ = conn.execute(
+                    "UPDATE departments SET competencies = ?1
+                     WHERE UPPER(code) = ?2 AND competencies = ?3",
+                    params![comp, code, legacy_comp],
+                );
+            }
+        }
+    }
+
+    let pt_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM program_types", [], |r| r.get(0))
+        .unwrap_or(0);
+    if pt_count == 0 {
+        let default_program_types = [
+            (
+                "OJT",
+                "on-the-job training program",
+                6_i64,
+                "Belajar langsung sambil bekerja di bawah supervisor (siswa SMK/mahasiswa pariwisata, karyawan baru)",
+                10_i64,
+            ),
+            (
+                "INT",
+                "internship program",
+                3,
+                "Magang terstruktur, sering bagian dari kurikulum kampus (mahasiswa, 3-6 bulan)",
+                20,
+            ),
+            (
+                "APP",
+                "apprenticeship program",
+                6,
+                "Pelatihan jangka panjang dengan jenjang keterampilan (calon staf tetap)",
+                30,
+            ),
+            (
+                "MT",
+                "management trainee program",
+                6,
+                "Rotasi antar departemen untuk calon pemimpin (lulusan D3/S1)",
+                40,
+            ),
+            (
+                "WS",
+                "short course / workshop",
+                1,
+                "Pelatihan singkat topik tertentu 1-5 hari (staf yang sudah ada)",
+                50,
+            ),
+            (
+                "REF",
+                "refresher / skill upgrade program",
+                1,
+                "Penyegaran keterampilan atau standar baru (staf lama)",
+                60,
+            ),
+            (
+                "CERT",
+                "certification course",
+                1,
+                "Pelatihan dengan ujian (food safety, first aid, fire safety)",
+                70,
+            ),
+        ];
+        for (code, name, months, desc, sort_order) in default_program_types {
+            let _ = conn.execute(
+                "INSERT INTO program_types (code, name, default_duration_months, description, is_active, sort_order)
+                 VALUES (?1, ?2, ?3, ?4, 1, ?5)",
+                params![code, name, months, desc, sort_order],
+            );
+        }
+    }
+    Ok(())
+}
+
+fn map_department_row(r: &rusqlite::Row) -> rusqlite::Result<DepartmentRow> {
+    let active_flag: i64 = r.get(5)?;
+    Ok(DepartmentRow {
+        id: r.get(0)?,
+        code: r.get(1)?,
+        name: r.get(2)?,
+        program_description: r.get(3)?,
+        competencies: r.get(4)?,
+        is_active: active_flag != 0,
+        sort_order: r.get(6)?,
+        created_at: r.get(7)?,
+    })
+}
+
+fn map_program_type_row(r: &rusqlite::Row) -> rusqlite::Result<ProgramTypeRow> {
+    let active_flag: i64 = r.get(5)?;
+    Ok(ProgramTypeRow {
+        id: r.get(0)?,
+        code: r.get(1)?,
+        name: r.get(2)?,
+        default_duration_months: r.get(3)?,
+        description: r.get(4)?,
+        is_active: active_flag != 0,
+        sort_order: r.get(6)?,
+        created_at: r.get(7)?,
+    })
+}
+
+/// Lists all training departments ordered by `sort_order`, then name.
+pub fn get_departments(conn: &Connection) -> Result<Vec<DepartmentRow>, String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, code, name, program_description, competencies, is_active, sort_order, created_at
+             FROM departments
+             ORDER BY sort_order ASC, name ASC",
+        )
+        .map_err(|e| format!("Gagal membaca daftar departemen: {}", e))?;
+    let items = stmt
+        .query_map([], map_department_row)
+        .map_err(|e| format!("Gagal memindai departemen: {}", e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    Ok(items)
+}
+
+/// Creates or updates a training department entry in SQLite.
+pub fn save_department(conn: &Connection, input: &DepartmentInput) -> Result<DepartmentRow, String> {
+    let code = sanitize_catalog_code(&input.code)?;
+    let name = input.name.trim();
+    if name.is_empty() {
+        return Err("Nama departemen wajib diisi.".to_string());
+    }
+    let desc = input.program_description.trim();
+    let comp = input.competencies.trim();
+
+    let target_id = if let Some(id) = input.id {
+        let active_opt = input.is_active.map(|b| if b { 1_i64 } else { 0 });
+        let affected = conn
+            .execute(
+                "UPDATE departments
+                 SET code = ?1, name = ?2, program_description = ?3, competencies = ?4,
+                     is_active = COALESCE(?5, is_active), sort_order = COALESCE(?6, sort_order)
+                 WHERE id = ?7",
+                params![code, name, desc, comp, active_opt, input.sort_order, id],
+            )
+            .map_err(|e| {
+                if e.to_string().contains("UNIQUE") {
+                    format!("Kode departemen '{}' sudah digunakan.", code)
+                } else {
+                    format!("Gagal memperbarui departemen: {}", e)
+                }
+            })?;
+        if affected == 0 {
+            return Err("Departemen tidak ditemukan.".to_string());
+        }
+        id
+    } else {
+        let active_val: i64 = if input.is_active.unwrap_or(true) { 1 } else { 0 };
+        let sort_order = input.sort_order.unwrap_or_else(|| {
+            conn.query_row("SELECT COALESCE(MAX(sort_order), 0) + 10 FROM departments", [], |r| r.get(0))
+                .unwrap_or(10)
+        });
+        conn.execute(
+            "INSERT INTO departments (code, name, program_description, competencies, is_active, sort_order)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![code, name, desc, comp, active_val, sort_order],
+        )
+        .map_err(|e| {
+            if e.to_string().contains("UNIQUE") {
+                format!("Kode departemen '{}' sudah digunakan.", code)
+            } else {
+                format!("Gagal menambah departemen: {}", e)
+            }
+        })?;
+        conn.last_insert_rowid()
+    };
+
+    conn.query_row(
+        "SELECT id, code, name, program_description, competencies, is_active, sort_order, created_at
+         FROM departments WHERE id = ?1",
+        params![target_id],
+        map_department_row,
+    )
+    .map_err(|e| format!("Gagal memuat ulang departemen: {}", e))
+}
+
+/// Permanently deletes a department catalog entry by ID.
+pub fn delete_department(conn: &Connection, id: i64) -> Result<(), String> {
+    let affected = conn
+        .execute("DELETE FROM departments WHERE id = ?1", params![id])
+        .map_err(|e| format!("Gagal menghapus departemen: {}", e))?;
+    if affected == 0 {
+        return Err("Departemen tidak ditemukan.".to_string());
+    }
+    Ok(())
+}
+
+/// Lists all certificate program types ordered by `sort_order`, then name.
+pub fn get_program_types(conn: &Connection) -> Result<Vec<ProgramTypeRow>, String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, code, name, default_duration_months, description, is_active, sort_order, created_at
+             FROM program_types
+             ORDER BY sort_order ASC, name ASC",
+        )
+        .map_err(|e| format!("Gagal membaca daftar jenis program: {}", e))?;
+    let items = stmt
+        .query_map([], map_program_type_row)
+        .map_err(|e| format!("Gagal memindai jenis program: {}", e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    Ok(items)
+}
+
+/// Creates or updates a certificate program type entry in SQLite.
+pub fn save_program_type(
+    conn: &Connection,
+    input: &ProgramTypeInput,
+) -> Result<ProgramTypeRow, String> {
+    let code = sanitize_catalog_code(&input.code)?;
+    let name = input.name.trim();
+    if name.is_empty() {
+        return Err("Nama jenis program wajib diisi.".to_string());
+    }
+    let months = input.default_duration_months.clamp(1, 36);
+    let desc = input.description.trim();
+
+    let target_id = if let Some(id) = input.id {
+        let active_opt = input.is_active.map(|b| if b { 1_i64 } else { 0 });
+        let affected = conn
+            .execute(
+                "UPDATE program_types
+                 SET code = ?1, name = ?2, default_duration_months = ?3, description = ?4,
+                     is_active = COALESCE(?5, is_active), sort_order = COALESCE(?6, sort_order)
+                 WHERE id = ?7",
+                params![code, name, months, desc, active_opt, input.sort_order, id],
+            )
+            .map_err(|e| {
+                if e.to_string().contains("UNIQUE") {
+                    format!("Kode jenis program '{}' sudah digunakan.", code)
+                } else {
+                    format!("Gagal memperbarui jenis program: {}", e)
+                }
+            })?;
+        if affected == 0 {
+            return Err("Jenis program tidak ditemukan.".to_string());
+        }
+        id
+    } else {
+        let active_val: i64 = if input.is_active.unwrap_or(true) { 1 } else { 0 };
+        let sort_order = input.sort_order.unwrap_or_else(|| {
+            conn.query_row("SELECT COALESCE(MAX(sort_order), 0) + 10 FROM program_types", [], |r| r.get(0))
+                .unwrap_or(10)
+        });
+        conn.execute(
+            "INSERT INTO program_types (code, name, default_duration_months, description, is_active, sort_order)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![code, name, months, desc, active_val, sort_order],
+        )
+        .map_err(|e| {
+            if e.to_string().contains("UNIQUE") {
+                format!("Kode jenis program '{}' sudah digunakan.", code)
+            } else {
+                format!("Gagal menambah jenis program: {}", e)
+            }
+        })?;
+        conn.last_insert_rowid()
+    };
+
+    conn.query_row(
+        "SELECT id, code, name, default_duration_months, description, is_active, sort_order, created_at
+         FROM program_types WHERE id = ?1",
+        params![target_id],
+        map_program_type_row,
+    )
+    .map_err(|e| format!("Gagal memuat ulang jenis program: {}", e))
+}
+
+/// Permanently deletes a program type catalog entry by ID.
+pub fn delete_program_type(conn: &Connection, id: i64) -> Result<(), String> {
+    let affected = conn
+        .execute("DELETE FROM program_types WHERE id = ?1", params![id])
+        .map_err(|e| format!("Gagal menghapus jenis program: {}", e))?;
+    if affected == 0 {
+        return Err("Jenis program tidak ditemukan.".to_string());
+    }
+    Ok(())
 }

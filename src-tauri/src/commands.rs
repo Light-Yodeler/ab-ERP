@@ -3,7 +3,8 @@ use crate::certificate::{
     self, CertificatePreviewInput, CertificateRenderData, CertificateSettingsPayload,
 };
 use crate::db::{
-    self, ImportLogRow, PaginatedCertificates, PaginatedRoomReservations, PaginatedTransactions,
+    self, DepartmentInput, DepartmentRow, ImportLogRow, PaginatedCertificates,
+    PaginatedRoomReservations, PaginatedTransactions, ProgramTypeInput, ProgramTypeRow,
     RoomReservationUpdate, StorageInfo, TrainingCertificateInput, TrainingCertificateRow, UnitRow,
 };
 use crate::excel::{
@@ -716,11 +717,15 @@ pub fn get_certificate_years(state: State<'_, AppState>) -> Result<Vec<String>, 
 pub fn get_next_certificate_no(
     state: State<'_, AppState>,
     year: Option<i32>,
+    month: Option<u32>,
+    department_code: Option<String>,
 ) -> Result<String, String> {
     require_authenticated(&state)?;
-    let target_year = year.unwrap_or_else(|| chrono::Datelike::year(&chrono::Local::now().date_naive()));
+    let now = chrono::Local::now().date_naive();
+    let target_year = year.unwrap_or_else(|| chrono::Datelike::year(&now));
+    let target_month = month.unwrap_or_else(|| chrono::Datelike::month(&now));
     let conn = state.db.lock().map_err(|e| e.to_string())?;
-    db::get_next_certificate_number(&conn, target_year)
+    db::get_next_certificate_number(&conn, target_year, target_month, department_code.as_deref())
 }
 
 #[tauri::command]
@@ -851,6 +856,8 @@ pub fn update_certificate_settings(
     program_name: String,
     paper_size: String,
     show_signature: bool,
+    issued_city: Option<String>,
+    body_template: Option<String>,
 ) -> Result<CertificateSettingsPayload, String> {
     require_admin(&state)?;
     let clean_signer = signer_name.trim();
@@ -874,6 +881,24 @@ pub fn update_certificate_settings(
         "certShowSignature".to_string(),
         if show_signature { "1" } else { "0" }.to_string(),
     );
+    if let Some(city) = issued_city {
+        let trimmed = city.trim();
+        let val = if trimmed.is_empty() {
+            certificate::DEFAULT_ISSUED_CITY
+        } else {
+            trimmed
+        };
+        updates.insert("certIssuedCity".to_string(), val.to_string());
+    }
+    if let Some(tpl) = body_template {
+        let trimmed = tpl.trim();
+        let val = if trimmed.is_empty() {
+            certificate::DEFAULT_BODY_TEMPLATE
+        } else {
+            trimmed
+        };
+        updates.insert("certBodyTemplate".to_string(), val.to_string());
+    }
 
     let settings = {
         let conn = state.db.lock().map_err(|e| e.to_string())?;
@@ -956,4 +981,52 @@ pub fn clear_certificate_asset(
         &state.cert_assets_dir,
         &settings,
     ))
+}
+
+#[tauri::command]
+pub fn get_departments(state: State<'_, AppState>) -> Result<Vec<DepartmentRow>, String> {
+    require_authenticated(&state)?;
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    db::get_departments(&conn)
+}
+
+#[tauri::command]
+pub fn save_department(
+    state: State<'_, AppState>,
+    payload: DepartmentInput,
+) -> Result<DepartmentRow, String> {
+    require_admin(&state)?;
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    db::save_department(&conn, &payload)
+}
+
+#[tauri::command]
+pub fn delete_department(state: State<'_, AppState>, id: i64) -> Result<(), String> {
+    require_admin(&state)?;
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    db::delete_department(&conn, id)
+}
+
+#[tauri::command]
+pub fn get_program_types(state: State<'_, AppState>) -> Result<Vec<ProgramTypeRow>, String> {
+    require_authenticated(&state)?;
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    db::get_program_types(&conn)
+}
+
+#[tauri::command]
+pub fn save_program_type(
+    state: State<'_, AppState>,
+    payload: ProgramTypeInput,
+) -> Result<ProgramTypeRow, String> {
+    require_admin(&state)?;
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    db::save_program_type(&conn, &payload)
+}
+
+#[tauri::command]
+pub fn delete_program_type(state: State<'_, AppState>, id: i64) -> Result<(), String> {
+    require_admin(&state)?;
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    db::delete_program_type(&conn, id)
 }

@@ -25,6 +25,10 @@ const MAX_ASSET_BYTES: u64 = 5 * 1024 * 1024;
 const ALLOWED_LOGO_FILES: &[&str] = &["custom_logo.png", "custom_logo.jpg"];
 const ALLOWED_SIGNATURE_FILES: &[&str] = &["custom_signature.png", "custom_signature.jpg"];
 
+pub const DEFAULT_PROPERTY_NAME: &str = "Anda Bungalows & Restaurant";
+pub const DEFAULT_ISSUED_CITY: &str = "Kuta, Lombok";
+pub const DEFAULT_BODY_TEMPLATE: &str = "for successfully completing the {durasi} {jenis_program} in the {departemen} at {properti}, from {mulai} to {selesai}.";
+
 const ENGLISH_MONTHS: [&str; 12] = [
     "January",
     "February",
@@ -50,6 +54,10 @@ pub struct CertificatePreviewInput {
     pub end_date: Option<String>,
     pub issued_date: Option<String>,
     #[serde(default)]
+    pub issued_city: Option<String>,
+    #[serde(default)]
+    pub body_template: Option<String>,
+    #[serde(default)]
     pub department: Option<String>,
     #[serde(default)]
     pub achievement_text: Option<String>,
@@ -65,6 +73,8 @@ pub struct CertificateSettingsPayload {
     pub signer_title: String,
     pub program_name: String,
     pub paper_size: String,
+    pub issued_city: String,
+    pub body_template: String,
     pub show_signature: bool,
     pub has_custom_logo: bool,
     pub has_custom_signature: bool,
@@ -78,9 +88,14 @@ pub struct CertificateRenderData {
     pub recipient_name: String,
     pub duration_text: String,
     pub program_name: String,
+    pub start_date_display: String,
+    pub end_date_display: String,
+    pub is_same_day_span: bool,
     pub issued_date: String,
+    pub issued_city: Option<String>,
+    pub body_template: String,
+    pub property_name: String,
     pub date_range_display: String,
-    pub show_awarded_line: bool,
     pub department: Option<String>,
     pub achievement_text: Option<String>,
     pub signer_name: String,
@@ -133,6 +148,16 @@ impl CertificateRenderData {
             .map(String::as_str)
             .filter(|s| *s == "F4" || *s == "A4")
             .unwrap_or("F4");
+        let default_city = settings
+            .get("certIssuedCity")
+            .map(String::as_str)
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or(DEFAULT_ISSUED_CITY);
+        let default_template = settings
+            .get("certBodyTemplate")
+            .map(String::as_str)
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or(DEFAULT_BODY_TEMPLATE);
 
         let paper_size = match input.paper_size.as_deref().map(str::trim) {
             Some("A4") | Some("a4") => "A4".to_string(),
@@ -158,41 +183,82 @@ impl CertificateRenderData {
             None
         };
 
-        let issued_date = match input.issued_date.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        let fmt_date_or = |raw_opt: &Option<String>, placeholder: &str| -> String {
+            match raw_opt.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+                Some(raw) => format_english_date(raw).unwrap_or_else(|_| raw.to_string()),
+                None => placeholder.to_string(),
+            }
+        };
+
+        let start_date_display = fmt_date_or(&input.start_date, "[Start Date]");
+        let end_date_display = fmt_date_or(&input.end_date, "[End Date]");
+        let issued_trimmed = input
+            .issued_date
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty());
+        let issued_date = match issued_trimmed {
             Some(raw) => format_english_date(raw).unwrap_or_else(|_| raw.to_string()),
             None => "[Date]".to_string(),
         };
 
+        let parsed_start = input
+            .start_date
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .and_then(crate::excel_importer::parse_date_string);
         let parsed_end = input
             .end_date
             .as_deref()
             .map(str::trim)
             .filter(|s| !s.is_empty())
             .and_then(crate::excel_importer::parse_date_string);
-        let parsed_issued = input
-            .issued_date
+        let is_same_day_span = matches!((parsed_start, parsed_end), (Some(s), Some(e)) if s == e);
+
+        let recipient_name = match input
+            .recipient_name
             .as_deref()
             .map(str::trim)
             .filter(|s| !s.is_empty())
-            .and_then(crate::excel_importer::parse_date_string);
+        {
+            Some(raw) => normalize_recipient_name(raw),
+            None => "[Recipient Name]".to_string(),
+        };
 
-        let show_awarded_line = match (parsed_issued, parsed_end) {
-            (Some(iss), Some(end)) => iss != end,
-            (Some(_), None) => true,
-            (None, _) => false,
+        let issued_city = match input
+            .issued_city
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty() && *s != "-")
+        {
+            Some(c) => Some(c.to_string()),
+            None => {
+                let fallback = default_city.trim();
+                if fallback.is_empty() || fallback == "-" {
+                    None
+                } else {
+                    Some(fallback.to_string())
+                }
+            }
         };
 
         Self {
-            certificate_no: non_empty(&input.certificate_no, "[000/ABR/YYYY]"),
-            recipient_name: non_empty(&input.recipient_name, "[Recipient Name]"),
+            certificate_no: non_empty(&input.certificate_no, "[000/ABR/I/YYYY]"),
+            recipient_name,
             duration_text: non_empty(&input.duration_text, "[Duration]"),
             program_name: non_empty(&input.program_name, default_program),
+            start_date_display,
+            end_date_display,
+            is_same_day_span,
             issued_date,
+            issued_city,
+            body_template: non_empty(&input.body_template, default_template),
+            property_name: DEFAULT_PROPERTY_NAME.to_string(),
             date_range_display: format_english_date_range(
                 input.start_date.as_deref(),
                 input.end_date.as_deref(),
             ),
-            show_awarded_line,
             department: clean_opt(&input.department),
             achievement_text: clean_opt(&input.achievement_text),
             signer_name: non_empty(&input.signer_name, default_signer),
@@ -207,6 +273,282 @@ impl CertificateRenderData {
                 .map(|s| s.eq_ignore_ascii_case("revoked"))
                 .unwrap_or(false),
         }
+    }
+}
+
+fn capitalize_word(word: &str) -> String {
+    let mut out = String::with_capacity(word.len());
+    let mut capitalized = false;
+    for ch in word.chars() {
+        if !capitalized && ch.is_alphabetic() {
+            for up in ch.to_uppercase() {
+                out.push(up);
+            }
+            capitalized = true;
+        } else {
+            for lo in ch.to_lowercase() {
+                out.push(lo);
+            }
+        }
+    }
+    out
+}
+
+fn normalize_apostrophe_segment(seg: &str) -> String {
+    if let Some((head, tail)) = seg.split_once('\'') {
+        if head.chars().count() == 1
+            && tail.chars().count() >= 2
+            && matches!(head.to_ascii_lowercase().as_str(), "d" | "o" | "l")
+        {
+            return format!("{}'{}", capitalize_word(head), capitalize_word(tail));
+        }
+        let lower_tail: String = tail.chars().flat_map(char::to_lowercase).collect();
+        return format!("{}'{}", capitalize_word(head), lower_tail);
+    }
+    capitalize_word(seg)
+}
+
+fn is_prefix_title_token(token: &str) -> bool {
+    let cleaned = token.trim().trim_end_matches('.').to_ascii_lowercase();
+    matches!(
+        cleaned.as_str(),
+        "prof"
+            | "dr"
+            | "drg"
+            | "ir"
+            | "drs"
+            | "dra"
+            | "h"
+            | "hj"
+            | "k.h"
+            | "kh"
+            | "tgh"
+            | "r"
+            | "r.a"
+            | "ra"
+            | "mr"
+            | "mrs"
+            | "ms"
+    )
+}
+
+fn normalize_name_token(token: &str, is_first_word: bool, after_prof: bool) -> String {
+    if token.is_empty() {
+        return String::new();
+    }
+    if token == "dr." && !after_prof {
+        return "dr.".to_string();
+    }
+    if token == "drg." {
+        return "drg.".to_string();
+    }
+
+    let lower = token.to_ascii_lowercase();
+    match lower.as_str() {
+        "prof" | "prof." => return "Prof.".to_string(),
+        "dr" | "dr." => return "Dr.".to_string(),
+        "drg" | "drg." => return "drg.".to_string(),
+        "ir" | "ir." => return "Ir.".to_string(),
+        "drs" | "drs." => return "Drs.".to_string(),
+        "dra" | "dra." => return "Dra.".to_string(),
+        "h" | "h." => return "H.".to_string(),
+        "hj" | "hj." => return "Hj.".to_string(),
+        "k.h." | "kh." | "kh" => return "K.H.".to_string(),
+        "tgh" | "tgh." => return "TGH.".to_string(),
+        "r." => return "R.".to_string(),
+        "r.a." | "ra." => return "R.A.".to_string(),
+        "mr" | "mr." => return "Mr.".to_string(),
+        "mrs" | "mrs." => return "Mrs.".to_string(),
+        "ms" | "ms." => return "Ms.".to_string(),
+        _ => {}
+    }
+
+    if token.contains('.') {
+        let parts: Vec<&str> = token.split('.').filter(|s| !s.is_empty()).collect();
+        if !parts.is_empty() && parts.iter().all(|p| p.chars().count() <= 2) {
+            let formatted: Vec<String> = parts
+                .iter()
+                .map(|p| {
+                    if p.chars().count() == 1 {
+                        p.to_uppercase()
+                    } else {
+                        capitalize_word(p)
+                    }
+                })
+                .collect();
+            return format!("{}.", formatted.join("."));
+        }
+    }
+
+    if !is_first_word
+        && matches!(
+            lower.as_str(),
+            "bin" | "binti" | "ibnu" | "van" | "von" | "de" | "del" | "der" | "da" | "di" | "la" | "le"
+        )
+    {
+        return lower;
+    }
+
+    if token.contains('-') {
+        return token
+            .split('-')
+            .map(normalize_apostrophe_segment)
+            .collect::<Vec<_>>()
+            .join("-");
+    }
+
+    normalize_apostrophe_segment(token)
+}
+
+fn normalize_degree_token(token: &str) -> String {
+    let trimmed = token.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+    let compact: String = trimmed
+        .chars()
+        .filter(|c| *c != '.')
+        .flat_map(char::to_lowercase)
+        .collect();
+
+    let canonical = match compact.as_str() {
+        "amd" => Some("A.Md."),
+        "amdpar" => Some("A.Md.Par."),
+        "amdak" => Some("A.Md.Ak."),
+        "amdkom" => Some("A.Md.Kom."),
+        "ama" => Some("A.Ma."),
+        "strpar" => Some("S.Tr.Par."),
+        "strkom" => Some("S.Tr.Kom."),
+        "strak" => Some("S.Tr.Ak."),
+        "strsos" => Some("S.Tr.Sos."),
+        "spar" => Some("S.Par."),
+        "mpar" => Some("M.Par."),
+        "se" => Some("S.E."),
+        "sh" => Some("S.H."),
+        "st" => Some("S.T."),
+        "skom" => Some("S.Kom."),
+        "spd" => Some("S.Pd."),
+        "ssos" => Some("S.Sos."),
+        "ssi" => Some("S.Si."),
+        "sip" => Some("S.IP."),
+        "spsi" => Some("S.Psi."),
+        "sag" => Some("S.Ag."),
+        "sak" => Some("S.Ak."),
+        "smn" => Some("S.Mn."),
+        "sab" => Some("S.AB."),
+        "sikom" => Some("S.I.Kom."),
+        "shum" => Some("S.Hum."),
+        "sked" => Some("S.Ked."),
+        "skep" => Some("S.Kep."),
+        "sfarm" => Some("S.Farm."),
+        "sgz" => Some("S.Gz."),
+        "sp" => Some("S.P."),
+        "spt" => Some("S.Pt."),
+        "spi" => Some("S.Pi."),
+        "ssn" => Some("S.Sn."),
+        "sds" => Some("S.Ds."),
+        "mm" => Some("M.M."),
+        "msi" => Some("M.Si."),
+        "mkom" => Some("M.Kom."),
+        "mpd" => Some("M.Pd."),
+        "mt" => Some("M.T."),
+        "mh" => Some("M.H."),
+        "msc" => Some("M.Sc."),
+        "ma" => Some("M.A."),
+        "mba" => Some("MBA"),
+        "mak" => Some("M.Ak."),
+        "mhum" => Some("M.Hum."),
+        "mpsi" => Some("M.Psi."),
+        "phd" => Some("Ph.D."),
+        "bsc" => Some("B.Sc."),
+        "ba" => Some("B.A."),
+        "che" => Some("CHE"),
+        "cha" => Some("CHA"),
+        "diii" => Some("D.III"),
+        "div" => Some("D.IV"),
+        _ => None,
+    };
+    if let Some(hit) = canonical {
+        return hit.to_string();
+    }
+
+    if trimmed.contains('.') {
+        let ends_with_dot = trimmed.ends_with('.');
+        let parts: Vec<&str> = trimmed.split('.').filter(|s| !s.is_empty()).collect();
+        if !parts.is_empty() {
+            let formatted: Vec<String> = parts
+                .iter()
+                .map(|p| {
+                    if p.chars().count() == 1 {
+                        p.to_uppercase()
+                    } else if (2..=3).contains(&p.chars().count())
+                        && p.chars().all(|c| c.is_ascii_uppercase())
+                    {
+                        (*p).to_string()
+                    } else {
+                        capitalize_word(p)
+                    }
+                })
+                .collect();
+            return if ends_with_dot {
+                format!("{}.", formatted.join("."))
+            } else {
+                formatted.join(".")
+            };
+        }
+    }
+
+    if trimmed.chars().count() <= 4 && trimmed.chars().all(|c| c.is_ascii_alphabetic()) {
+        return trimmed.to_ascii_uppercase();
+    }
+    capitalize_word(trimmed)
+}
+
+/// Normalizes recipient names, Indonesian/international prefix titles, and comma-separated academic degrees.
+pub fn normalize_recipient_name(raw: &str) -> String {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+    let mut segments = trimmed.split(',');
+    let name_part = segments.next().unwrap_or("");
+    let words: Vec<&str> = name_part.split_whitespace().collect();
+    let mut seen_name_word = false;
+    let normalized_name: String = words
+        .iter()
+        .enumerate()
+        .map(|(idx, w)| {
+            let after_prof = idx > 0
+                && words[idx - 1]
+                    .to_ascii_lowercase()
+                    .trim_end_matches('.')
+                    == "prof";
+            let is_first_name_word = !seen_name_word;
+            if !is_prefix_title_token(w) {
+                seen_name_word = true;
+            }
+            normalize_name_token(w, is_first_name_word, after_prof)
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    let normalized_suffixes: Vec<String> = segments
+        .map(|seg| {
+            seg.split_whitespace()
+                .map(normalize_degree_token)
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    if normalized_suffixes.is_empty() {
+        normalized_name
+    } else if normalized_name.is_empty() {
+        normalized_suffixes.join(", ")
+    } else {
+        format!("{}, {}", normalized_name, normalized_suffixes.join(", "))
     }
 }
 
@@ -309,7 +651,7 @@ pub fn format_english_date_range(start_raw: Option<&str>, end_raw: Option<&str>)
     }
 }
 
-fn format_single_department(segment: &str) -> String {
+fn format_department_item(segment: &str, include_the: bool) -> String {
     let trimmed = segment.trim();
     let (raw_name, opt_dur) = if trimmed.ends_with(')') {
         if let Some(open_idx) = trimmed.rfind('(') {
@@ -343,14 +685,14 @@ fn format_single_department(segment: &str) -> String {
         format!("{} Department", without_the)
     };
 
+    let prefix = if include_the { "the " } else { "" };
     match opt_dur {
-        Some(dur) => format!("the {} ({})", base, dur),
-        None => format!("the {}", base),
+        Some(dur) => format!("{}{} ({})", prefix, base, dur),
+        None => format!("{}{}", prefix, base),
     }
 }
 
-/// Formats `; `-separated training divisions into formal hotel department phrasing.
-pub fn format_divisions_phrase(department_raw: Option<&str>) -> Option<String> {
+fn format_departments_list(department_raw: Option<&str>, leading_the: bool) -> Option<String> {
     let raw = department_raw?.trim();
     if raw.is_empty() {
         return None;
@@ -359,17 +701,23 @@ pub fn format_divisions_phrase(department_raw: Option<&str>) -> Option<String> {
         .split(';')
         .map(str::trim)
         .filter(|s| !s.is_empty() && *s != "-")
-        .map(format_single_department)
+        .enumerate()
+        .map(|(idx, seg)| format_department_item(seg, leading_the || idx > 0))
         .collect();
     match items.len() {
         0 => None,
-        1 => Some(format!("in {}", items[0])),
-        2 => Some(format!("in {} and {}", items[0], items[1])),
+        1 => Some(items[0].clone()),
+        2 => Some(format!("{} and {}", items[0], items[1])),
         _ => {
             let (last, head) = items.split_last()?;
-            Some(format!("in {}, and {}", head.join(", "), last))
+            Some(format!("{}, and {}", head.join(", "), last))
         }
     }
+}
+
+/// Formats `; `-separated training divisions into formal hotel department phrasing.
+pub fn format_divisions_phrase(department_raw: Option<&str>) -> Option<String> {
+    format_departments_list(department_raw, true).map(|joined| format!("in {}", joined))
 }
 
 fn ensure_trailing_period(text: &str) -> String {
@@ -454,6 +802,113 @@ fn count_divisions(department_raw: Option<&str>) -> usize {
         .count()
 }
 
+fn template_precedes_the(template: &str, placeholder: &str) -> bool {
+    if let Some(pos) = template.find(placeholder) {
+        let before = template[..pos].trim_end();
+        return before
+            .to_ascii_lowercase()
+            .ends_with("the")
+            && before
+                .chars()
+                .rev()
+                .nth(3)
+                .map_or(true, |c| !c.is_alphanumeric());
+    }
+    false
+}
+
+/// Renders the configurable certificate body sentence by substituting template variables.
+pub fn render_body_template(data: &CertificateRenderData) -> String {
+    let mut out = if data.body_template.trim().is_empty() {
+        DEFAULT_BODY_TEMPLATE.to_string()
+    } else {
+        data.body_template.trim().to_string()
+    };
+
+    if data.is_same_day_span {
+        for pat in [
+            "from {mulai} to {selesai}",
+            "from {tanggal_mulai} to {tanggal_selesai}",
+            "from {start_date} to {end_date}",
+        ] {
+            if out.contains(pat) {
+                out = out.replace(pat, "on {mulai}");
+            }
+        }
+    }
+
+    let leading_the = !template_precedes_the(&out, "{departemen}")
+        && !template_precedes_the(&out, "{department}");
+
+    if let Some(dept_text) = format_departments_list(data.department.as_deref(), leading_the) {
+        out = out
+            .replace("{departemen}", &dept_text)
+            .replace("{department}", &dept_text);
+    } else {
+        for phrase in [
+            "in the {departemen}",
+            "in the {department}",
+            "at the {departemen}",
+            "at the {department}",
+            "in {departemen}",
+            "in {department}",
+            "{departemen}",
+            "{department}",
+        ] {
+            out = out.replace(phrase, "");
+        }
+    }
+
+    let replacements = [
+        ("{durasi}", data.duration_text.as_str()),
+        ("{duration}", data.duration_text.as_str()),
+        ("{jenis_program}", data.program_name.as_str()),
+        ("{program}", data.program_name.as_str()),
+        ("{properti}", data.property_name.as_str()),
+        ("{property}", data.property_name.as_str()),
+        ("{mulai}", data.start_date_display.as_str()),
+        ("{tanggal_mulai}", data.start_date_display.as_str()),
+        ("{start_date}", data.start_date_display.as_str()),
+        ("{selesai}", data.end_date_display.as_str()),
+        ("{tanggal_selesai}", data.end_date_display.as_str()),
+        ("{end_date}", data.end_date_display.as_str()),
+        ("{penerima}", data.recipient_name.as_str()),
+        ("{recipient}", data.recipient_name.as_str()),
+        ("{nomor}", data.certificate_no.as_str()),
+        ("{certificate_no}", data.certificate_no.as_str()),
+    ];
+    for (token, val) in replacements {
+        if out.contains(token) {
+            out = out.replace(token, val);
+        }
+    }
+
+    let normalized: String = out.split_whitespace().collect::<Vec<_>>().join(" ");
+    let cleaned = normalized
+        .replace(" ,", ",")
+        .replace(" .", ".")
+        .trim()
+        .to_string();
+    ensure_trailing_period(&cleaned)
+}
+
+/// Formats the `"Issued in [city], on [date]"` line rendered below the certificate body.
+pub fn format_issued_line(data: &CertificateRenderData) -> Option<String> {
+    let date_part = data.issued_date.trim();
+    if date_part.is_empty() {
+        return None;
+    }
+    match data
+        .issued_city
+        .as_deref()
+        .map(str::trim)
+        .filter(|c| !c.is_empty())
+    {
+        Some(city) => Some(format!("Issued in {}, on {}", city, date_part)),
+        None => Some(format!("Issued on {}", date_part)),
+    }
+}
+
 /// Builds balanced, non-redundant body lines for the certificate text block.
 pub fn build_body_lines(data: &CertificateRenderData) -> Vec<String> {
     let is_a4 = data.paper_size.eq_ignore_ascii_case("A4");
@@ -461,32 +916,42 @@ pub fn build_body_lines(data: &CertificateRenderData) -> Vec<String> {
     let single_dept_max = if is_a4 { 108 } else { 120 };
 
     let mut lines = Vec::new();
-    let prog_line = format!(
-        "for successfully completing the {} {}",
-        data.duration_text, data.program_name
-    );
-    let place_period = format!(
-        "at Anda Bungalows & Restaurant, from {}.",
-        data.date_range_display
-    );
+    let uses_default_template = data.body_template.trim().is_empty()
+        || data.body_template.trim() == DEFAULT_BODY_TEMPLATE;
 
-    if let Some(div_phrase) = format_divisions_phrase(data.department.as_deref()) {
-        if count_divisions(data.department.as_deref()) == 1 {
-            let merged = format!("{} {}", prog_line, div_phrase);
-            if merged.chars().count() <= single_dept_max {
-                lines.push(merged);
+    if uses_default_template {
+        let prog_line = format!(
+            "for successfully completing the {} {}",
+            data.duration_text, data.program_name
+        );
+        let date_clause = if data.is_same_day_span {
+            format!("on {}", data.start_date_display)
+        } else {
+            format!("from {}", data.date_range_display)
+        };
+        let place_period = format!("at {}, {}.", data.property_name, date_clause);
+
+        if let Some(div_phrase) = format_divisions_phrase(data.department.as_deref()) {
+            if count_divisions(data.department.as_deref()) == 1 {
+                let merged = format!("{} {}", prog_line, div_phrase);
+                if merged.chars().count() <= single_dept_max {
+                    lines.push(merged);
+                } else {
+                    lines.extend(wrap_balanced_text(&merged, max_chars));
+                }
+                lines.extend(wrap_balanced_text(&place_period, max_chars));
             } else {
-                lines.extend(wrap_balanced_text(&merged, max_chars));
+                lines.extend(wrap_balanced_text(&prog_line, max_chars));
+                lines.extend(wrap_balanced_text(&div_phrase, max_chars));
+                lines.extend(wrap_balanced_text(&place_period, max_chars));
             }
-            lines.extend(wrap_balanced_text(&place_period, max_chars));
         } else {
             lines.extend(wrap_balanced_text(&prog_line, max_chars));
-            lines.extend(wrap_balanced_text(&div_phrase, max_chars));
             lines.extend(wrap_balanced_text(&place_period, max_chars));
         }
     } else {
-        lines.extend(wrap_balanced_text(&prog_line, max_chars));
-        lines.extend(wrap_balanced_text(&place_period, max_chars));
+        let rendered = render_body_template(data);
+        lines.extend(wrap_balanced_text(&rendered, max_chars));
     }
 
     if let Some(ach) = data
@@ -497,10 +962,6 @@ pub fn build_body_lines(data: &CertificateRenderData) -> Vec<String> {
     {
         let normalized = ensure_trailing_period(ach);
         lines.extend(wrap_balanced_text(&normalized, max_chars));
-    }
-
-    if data.show_awarded_line {
-        lines.push(format!("Awarded on {}.", data.issued_date));
     }
 
     lines
@@ -589,6 +1050,16 @@ pub fn build_certificate_settings_payload(
             .filter(|s| !s.trim().is_empty())
             .unwrap_or_else(|| "hospitality training program".to_string()),
         paper_size: paper,
+        issued_city: settings
+            .get("certIssuedCity")
+            .cloned()
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| DEFAULT_ISSUED_CITY.to_string()),
+        body_template: settings
+            .get("certBodyTemplate")
+            .cloned()
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| DEFAULT_BODY_TEMPLATE.to_string()),
         show_signature: settings
             .get("certShowSignature")
             .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
@@ -718,20 +1189,18 @@ pub fn render_certificate_svg(data: &CertificateRenderData) -> String {
     let recip_y = 116.34 + y_off + 8.0 + (recip_fs * 0.32);
 
     let body_lines = build_body_lines(data);
+    let issued_line = format_issued_line(data);
     let line_count = body_lines.len();
-    let (body_pt, body_step, body_first_y) = match line_count {
-        0..=2 => (11.0_f64, pt_to_mm(11.0) * 1.62, 148.20 + y_off + 3.55),
-        3 => (11.0_f64, pt_to_mm(11.0) * 1.54, 146.37 + y_off + 3.55),
-        4 => (10.5_f64, 5.35_f64, 143.50 + y_off + 3.40),
-        5 => (10.0_f64, 4.85_f64, 141.60 + y_off + 3.20),
-        _ => (9.2_f64, 4.05_f64, 138.80 + y_off + 2.95),
+    let visual_lines = line_count + usize::from(issued_line.is_some());
+    let (body_pt, body_step, body_first_y) = match visual_lines {
+        0..=2 => (11.0_f64, pt_to_mm(11.0) * 1.60, 148.20 + y_off + 3.55),
+        3 => (11.0_f64, pt_to_mm(11.0) * 1.50, 145.00 + y_off + 3.55),
+        4 => (10.5_f64, 5.20_f64, 142.20 + y_off + 3.40),
+        5 => (10.0_f64, 4.70_f64, 139.80 + y_off + 3.20),
+        6 => (9.2_f64, 4.10_f64, 137.40 + y_off + 2.95),
+        _ => (8.6_f64, 3.70_f64, 135.80 + y_off + 2.75),
     };
     let body_fs = pt_to_mm(body_pt);
-    let body_bottom_y = if line_count == 0 {
-        body_first_y
-    } else {
-        body_first_y + ((line_count - 1) as f64) * body_step + (body_fs * 0.30)
-    };
     let body_markup: String = body_lines
         .iter()
         .enumerate()
@@ -746,6 +1215,35 @@ pub fn render_certificate_svg(data: &CertificateRenderData) -> String {
             )
         })
         .collect();
+
+    let (issued_markup, body_bottom_y) = if let Some(issued_text) = &issued_line {
+        let issued_fs = pt_to_mm((body_pt - 0.8).max(8.4));
+        let issued_gap = if line_count == 0 {
+            0.0
+        } else {
+            body_step + 1.4
+        };
+        let issued_y = if line_count == 0 {
+            body_first_y
+        } else {
+            body_first_y + ((line_count - 1) as f64) * body_step + issued_gap
+        };
+        let markup = format!(
+            "<text x=\"{cx:.2}\" y=\"{issued_y:.2}\" text-anchor=\"middle\" font-family=\"'Libre Baskerville', serif\" font-weight=\"400\" font-size=\"{issued_fs:.3}\" fill=\"#3F3F46\">{text}</text>",
+            cx = cx,
+            issued_y = issued_y,
+            issued_fs = issued_fs,
+            text = escape_xml(issued_text),
+        );
+        (markup, issued_y + (issued_fs * 0.35))
+    } else if line_count == 0 {
+        (String::new(), body_first_y)
+    } else {
+        (
+            String::new(),
+            body_first_y + ((line_count - 1) as f64) * body_step + (body_fs * 0.30),
+        )
+    };
 
     let signer_fs = pt_to_mm(13.4);
     let signer_ls = signer_fs * 0.025;
@@ -764,17 +1262,20 @@ pub fn render_certificate_svg(data: &CertificateRenderData) -> String {
             let sig_w = 44.0;
             let signer_top_y = signer_y - 4.0;
             let max_sig_top = body_bottom_y + 1.5;
-            let sig_h = (signer_top_y - max_sig_top).clamp(7.0, 14.0);
-            let sig_y = (signer_top_y - sig_h).max(max_sig_top);
-            let sig_x = cx - (sig_w / 2.0);
-            sig_markup = format!(
-                "<image x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" preserveAspectRatio=\"xMidYMid meet\" href=\"{}\"/>",
-                sig_x,
-                sig_y,
-                sig_w,
-                sig_h,
-                escape_xml(sig_uri)
-            );
+            let available = (signer_top_y - max_sig_top).max(0.0);
+            if available >= 4.0 {
+                let sig_h = available.min(13.0);
+                let sig_y = signer_top_y - sig_h;
+                let sig_x = cx - (sig_w / 2.0);
+                sig_markup = format!(
+                    "<image x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" preserveAspectRatio=\"xMidYMid meet\" href=\"{}\"/>",
+                    sig_x,
+                    sig_y,
+                    sig_w,
+                    sig_h,
+                    escape_xml(sig_uri)
+                );
+            }
         }
     }
 
@@ -799,6 +1300,7 @@ pub fn render_certificate_svg(data: &CertificateRenderData) -> String {
 <text x=\"{cx:.2}\" y=\"{sub_y:.2}\" text-anchor=\"middle\" font-family=\"'Libre Baskerville', serif\" font-weight=\"400\" font-size=\"{sub_fs:.3}\" fill=\"#000000\">This certificate is proudly presented to</text>\
 <text x=\"{cx:.2}\" y=\"{recip_y:.2}\" text-anchor=\"middle\" font-family=\"'Source Serif Pro', serif\" font-weight=\"700\" font-size=\"{recip_fs:.3}\" fill=\"#000000\">{recipient}</text>\
 {body_markup}\
+{issued_markup}\
 {sig_markup}\
 <text x=\"{cx:.2}\" y=\"{signer_y:.2}\" text-anchor=\"middle\" font-family=\"'Source Serif Pro', serif\" font-weight=\"700\" font-size=\"{signer_fs:.3}\" letter-spacing=\"{signer_ls:.3}\" fill=\"#1F1F1F\">{signer_name}</text>\
 <line x1=\"{div_x1:.2}\" y1=\"{divider_y:.2}\" x2=\"{div_x2:.2}\" y2=\"{divider_y:.2}\" stroke=\"#C67D24\" stroke-width=\"0.35\"/>\
@@ -833,6 +1335,7 @@ pub fn render_certificate_svg(data: &CertificateRenderData) -> String {
         recip_fs = recip_fs,
         recipient = escape_xml(&data.recipient_name),
         body_markup = body_markup,
+        issued_markup = issued_markup,
         sig_markup = sig_markup,
         signer_y = signer_y,
         signer_fs = signer_fs,

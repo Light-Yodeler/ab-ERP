@@ -93,6 +93,12 @@ pub fn run() {
             upload_certificate_asset,
             clear_certificate_asset,
             print_certificate,
+            get_departments,
+            save_department,
+            delete_department,
+            get_program_types,
+            save_program_type,
+            delete_program_type,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

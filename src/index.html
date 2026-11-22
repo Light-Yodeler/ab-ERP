@@ -90,7 +90,7 @@
           </div>
           <div class="brand-text">
             <div class="brand-title">ANDA ERP</div>
-            <div class="brand-subtitle">Pelaporan & Rekapitulasi Pajak</div>
+            <div class="brand-subtitle">Operasional &amp; Pajak Daerah</div>
           </div>
         </div>
 
@@ -993,6 +993,9 @@
             <span id="cert-summary-counts" class="card-subtitle">0 Tersimpan</span>
           </div>
           <div class="header-actions">
+            <button type="button" id="btn-cert-catalog" class="btn btn-secondary hidden">
+              Departemen &amp; Program
+            </button>
             <button type="button" id="btn-cert-settings" class="btn btn-secondary hidden">
               Pengaturan Logo &amp; TTD
             </button>
@@ -1003,7 +1006,10 @@
           <!-- Left: Form Input Sertifikat -->
           <section class="card cert-form-card">
             <div class="card-header">
-              <h2 id="cert-form-heading" class="card-title">Buat Sertifikat Baru</h2>
+              <div class="cert-form-title-wrap">
+                <h2 id="cert-form-heading" class="card-title">Buat Sertifikat Baru</h2>
+                <span id="cert-dirty-badge" class="cert-dirty-badge hidden">Belum Disimpan</span>
+              </div>
               <button type="button" id="btn-cert-reset" class="btn btn-secondary btn-sm">Baru / Reset</button>
             </div>
 
@@ -1018,12 +1024,12 @@
                   <label for="cert-no" class="cert-field-label">
                     Nomor Sertifikat <span class="cert-required-mark" aria-hidden="true">*</span>
                   </label>
-                  <span id="cert-no-hint" class="cert-field-hint">Format standar: 001/ABR/YYYY (otomatis berurutan per tahun)</span>
+                  <span id="cert-no-hint" class="cert-field-hint">Format otomatis: 001/ABR-FO/XI/2026 (kode departemen &amp; bulan Romawi, urutan unik per tahun)</span>
                   <div class="cert-inline-input">
                     <input type="text" id="cert-no" name="certificate_no" class="cert-field-control font-mono"
                       autocorrect="off" autocapitalize="none" spellcheck="false"
                       aria-describedby="cert-no-hint" data-error="cert-no-error" required
-                      placeholder="001/ABR/2026">
+                      placeholder="001/ABR-FO/XI/2026">
                     <button type="button" id="btn-cert-auto-no" class="btn btn-secondary btn-sm">Otomatis</button>
                   </div>
                   <div id="cert-no-error" class="cert-field-error">Error: Nomor sertifikat wajib diisi.</div>
@@ -1033,9 +1039,10 @@
                   <label for="cert-recipient" class="cert-field-label">
                     Nama Penerima <span class="cert-required-mark" aria-hidden="true">*</span>
                   </label>
+                  <span id="cert-recipient-hint" class="cert-field-hint">Kapitalisasi nama &amp; gelar (mis. Dr., H., S.Tr.Par., A.Md.Par.) dirapikan otomatis.</span>
                   <input type="text" id="cert-recipient" name="recipient_name" class="cert-field-control"
-                    autocomplete="name" data-error="cert-recipient-error" required
-                    placeholder="Nama Lengkap Peserta">
+                    autocomplete="name" aria-describedby="cert-recipient-hint" data-error="cert-recipient-error" required
+                    placeholder="Nama Lengkap Peserta, S.Tr.Par.">
                   <div id="cert-recipient-error" class="cert-field-error">Error: Nama penerima sertifikat wajib diisi.</div>
                 </div>
 
@@ -1058,13 +1065,18 @@
                 </div>
 
                 <div class="cert-field-group">
+                  <label for="cert-program-type" class="cert-field-label">
+                    Jenis Program <span class="cert-required-mark" aria-hidden="true">*</span>
+                  </label>
+                  <select id="cert-program-type" name="program_type_code" class="cert-field-control"></select>
+                </div>
+
+                <div class="cert-field-group">
                   <label for="cert-duration" class="cert-field-label">
                     Durasi (Inggris) <span class="cert-required-mark" aria-hidden="true">*</span>
                   </label>
-                  <span id="cert-duration-hint" class="cert-field-hint">Otomatis disarankan dari rentang tanggal</span>
                   <input type="text" id="cert-duration" name="duration_text" class="cert-field-control"
-                    aria-describedby="cert-duration-hint" data-error="cert-duration-error" required
-                    placeholder="three-month">
+                    data-error="cert-duration-error" required placeholder="three-month">
                   <div id="cert-duration-error" class="cert-field-error">Error: Durasi pelatihan (mis. three-month) wajib diisi.</div>
                 </div>
 
@@ -1072,30 +1084,43 @@
                   <label for="cert-issued" class="cert-field-label">
                     Tanggal Terbit <span class="cert-required-mark" aria-hidden="true">*</span>
                   </label>
-                  <span id="cert-issued-hint" class="cert-field-hint">Jika sama dengan Tanggal Selesai, baris "Awarded on" otomatis diringkas agar tidak berulang.</span>
+                  <span id="cert-issued-hint" class="cert-field-hint">Menentukan bulan Romawi &amp; urutan tahun nomor sertifikat.</span>
                   <input type="date" id="cert-issued" name="issued_date" class="cert-field-control"
                     aria-describedby="cert-issued-hint" data-error="cert-issued-error" required>
                   <div id="cert-issued-error" class="cert-field-error">Error: Tanggal terbit sertifikat wajib diisi.</div>
                 </div>
 
+                <div class="cert-field-group">
+                  <label for="cert-issued-city" class="cert-field-label">Kota Penerbitan</label>
+                  <span id="cert-issued-city-hint" class="cert-field-hint">Dicetak di baris &quot;Issued in [kota], on [tanggal]&quot;.</span>
+                  <input type="text" id="cert-issued-city" name="issued_city" class="cert-field-control"
+                    aria-describedby="cert-issued-city-hint" placeholder="Kuta, Lombok">
+                </div>
+
                 <div class="cert-field-group is-full">
                   <div class="cert-label-row">
-                    <span id="cert-divisions-label" class="cert-field-label">Bidang / Divisi Training (Dicetak di Sertifikat)</span>
+                    <span id="cert-divisions-label" class="cert-field-label">Departemen / Divisi Training (Dicetak di Sertifikat)</span>
                     <button type="button" id="btn-cert-add-division" class="btn btn-secondary btn-sm">+ Tambah Divisi (Rotasi)</button>
                   </div>
-                  <span id="cert-divisions-hint" class="cert-field-hint">Isi nama departemen saja (mis. Housekeeping, Food &amp; Beverage); kata "the ... Department" otomatis ditambahkan saat dicetak. Klik Tambah Divisi untuk rotasi lintas divisi.</span>
+                  <span id="cert-divisions-hint" class="cert-field-hint">1 departemen memakai kode NNN/ABR-KODE/ROMAWI/TAHUN; rotasi 2+ departemen memakai kode NNN/ABR-ROT/ROMAWI/TAHUN.</span>
                   <div id="cert-divisions-list" class="cert-divisions-stack" role="group" aria-labelledby="cert-divisions-label" aria-describedby="cert-divisions-hint"></div>
-                  <datalist id="cert-dept-options">
-                    <option value="Front Office"></option>
-                    <option value="Housekeeping"></option>
-                    <option value="Food &amp; Beverage"></option>
-                    <option value="Food &amp; Beverage Service"></option>
-                    <option value="Restaurant"></option>
-                    <option value="Kitchen"></option>
-                    <option value="Bar &amp; Beverage"></option>
-                    <option value="Accounting"></option>
-                    <option value="Engineering"></option>
-                  </datalist>
+                  <div id="cert-divisions-balance" class="cert-field-hint hidden" role="status"></div>
+                  <div id="cert-dept-criteria-panel" class="cert-dept-criteria hidden">
+                    <div class="cert-dept-criteria-head">
+                      <div class="cert-dept-criteria-info">
+                        <span id="cert-dept-criteria-title" class="cert-dept-criteria-title"></span>
+                        <p id="cert-dept-criteria-desc" class="cert-dept-criteria-desc"></p>
+                      </div>
+                      <button type="button" id="btn-apply-dept-desc" class="btn btn-secondary btn-sm">Pakai Deskripsi</button>
+                    </div>
+                    <div class="cert-dept-criteria-comp-wrap">
+                      <span class="cert-dept-criteria-sub">Kriteria &amp; Kompetensi Departemen (centang untuk dilampirkan di sertifikat):</span>
+                      <div id="cert-dept-competencies-list" class="cert-comp-chips"></div>
+                      <div class="cert-dept-criteria-actions">
+                        <button type="button" id="btn-apply-dept-comp" class="btn btn-secondary btn-sm">Lampirkan Kompetensi Terpilih</button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div class="cert-field-group is-full">
@@ -1103,6 +1128,7 @@
                   <div class="cert-achievement-stack">
                     <select id="cert-achievement-preset" class="cert-field-control" aria-label="Pilih template predikat sertifikat">
                       <option value="">Tanpa kalimat predikat</option>
+                      <option value="__custom__" hidden>Kustom / Deskripsi Departemen</option>
                       <option value="Achieving an Excellent rating in hospitality service and professionalism.">Excellent (Sangat Memuaskan)</option>
                       <option value="Achieving a Very Good rating in hospitality service and professionalism.">Very Good (Sangat Baik)</option>
                       <option value="Achieving a Good rating in hospitality service and professionalism.">Good (Baik)</option>
@@ -1142,9 +1168,18 @@
                 <div class="cert-optional-body">
                   <div class="cert-form-grid">
                     <div class="cert-field-group is-full">
-                      <label for="cert-program" class="cert-field-label">Nama Program Pelatihan</label>
+                      <label for="cert-program" class="cert-field-label">Nama Program Pelatihan (Override {jenis_program})</label>
                       <input type="text" id="cert-program" name="program_name" class="cert-field-control"
-                        placeholder="hospitality training program">
+                        placeholder="on-the-job training program">
+                    </div>
+                    <div class="cert-field-group is-full">
+                      <div class="cert-label-row">
+                        <label for="cert-body-template" class="cert-field-label">Template Kalimat Sertifikat (Opsional)</label>
+                      </div>
+                      <span id="cert-template-hint" class="cert-field-hint">Variabel: {durasi}, {jenis_program}, {departemen}, {properti}, {mulai}, {selesai}. Kosongkan untuk memakai template default pengaturan.</span>
+                      <textarea id="cert-body-template" name="body_template" class="cert-field-control" rows="2"
+                        aria-describedby="cert-template-hint"
+                        placeholder="for successfully completing the {durasi} {jenis_program} in the {departemen} at {properti}, from {mulai} to {selesai}."></textarea>
                     </div>
                     <div class="cert-field-group is-full">
                       <label for="cert-institution" class="cert-field-label">Asal Sekolah / Kampus</label>
@@ -1199,6 +1234,11 @@
                   Unduh PNG (300 DPI)
                 </button>
               </div>
+            </div>
+
+            <div id="cert-archive-preview-banner" class="cert-archive-preview-banner hidden">
+              <span id="cert-archive-preview-label">Pratinjau Arsip</span>
+              <button type="button" id="btn-cert-back-to-draft" class="btn btn-secondary btn-sm">Kembali ke Form</button>
             </div>
 
             <div class="cert-preview-stage">
@@ -1786,6 +1826,18 @@
             <option value="A4">A4 Horizontal (297 x 210 mm)</option>
           </select>
         </div>
+        <div class="cert-field-group is-full">
+          <label for="cfg-cert-city" class="cert-field-label">Kota Penerbitan Default</label>
+          <input type="text" id="cfg-cert-city" class="cert-field-control" placeholder="Kuta, Lombok" required>
+        </div>
+        <div class="cert-field-group is-full">
+          <div class="cert-label-row">
+            <label for="cfg-cert-template" class="cert-field-label">Template Kalimat Inti Default</label>
+            <button type="button" id="btn-reset-cert-template" class="btn btn-secondary btn-sm">Reset Default</button>
+          </div>
+          <span class="cert-field-hint">Variabel: {durasi}, {jenis_program}, {departemen}, {properti}, {mulai}, {selesai}</span>
+          <textarea id="cfg-cert-template" class="cert-field-control" rows="2" required></textarea>
+        </div>
       </div>
 
       <label class="cert-checkbox-row">
@@ -1822,6 +1874,107 @@
         <button type="submit" id="btn-save-cert-settings" class="btn cert-btn-primary">Simpan Pengaturan</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- Native Dialog: Kelola Katalog Departemen & Jenis Program (Khusus Admin) -->
+  <dialog id="dialog-cert-catalog" class="cert-catalog-dialog" aria-labelledby="cert-catalog-title">
+    <div class="modal-header">
+      <h2 id="cert-catalog-title" class="modal-title">Kelola Departemen &amp; Jenis Program</h2>
+      <button type="button" id="btn-close-cert-catalog" class="btn-close-modal" aria-label="Tutup katalog sertifikat">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="cert-catalog-status" class="cert-status-line info hidden" role="alert"></div>
+      <div id="cert-catalog-confirm" class="cert-archive-preview-banner hidden">
+        <span id="cert-catalog-confirm-text"></span>
+        <div class="cert-row-actions">
+          <button type="button" id="btn-cat-confirm-yes" class="btn btn-danger btn-sm">Ya, Hapus</button>
+          <button type="button" id="btn-cat-confirm-no" class="btn btn-secondary btn-sm">Batal</button>
+        </div>
+      </div>
+
+      <div class="cert-catalog-tabs" role="tablist" aria-label="Kategori katalog sertifikat">
+        <button type="button" id="tab-catalog-dept" class="cert-catalog-tab is-active" role="tab" aria-selected="true" aria-controls="panel-catalog-dept">
+          Departemen Hospitality
+        </button>
+        <button type="button" id="tab-catalog-prog" class="cert-catalog-tab" role="tab" aria-selected="false" aria-controls="panel-catalog-prog">
+          Jenis Program
+        </button>
+      </div>
+
+      <section id="panel-catalog-dept" class="cert-catalog-panel" role="tabpanel" aria-labelledby="tab-catalog-dept">
+        <div class="cert-catalog-layout">
+          <div class="cert-catalog-list-wrap">
+            <div id="catalog-dept-list" class="cert-catalog-list"></div>
+          </div>
+          <form id="form-catalog-dept" class="cert-catalog-form" novalidate>
+            <input type="hidden" id="cat-dept-id">
+            <div class="cert-form-grid">
+              <div class="cert-field-group">
+                <label for="cat-dept-code" class="cert-field-label">Kode Departemen</label>
+                <input type="text" id="cat-dept-code" class="cert-field-control font-mono"
+                  autocorrect="off" autocapitalize="none" spellcheck="false"
+                  maxlength="12" placeholder="KIT" required autofocus>
+              </div>
+              <div class="cert-field-group">
+                <label for="cat-dept-name" class="cert-field-label">Nama Departemen</label>
+                <input type="text" id="cat-dept-name" class="cert-field-control" placeholder="Kitchen" required>
+              </div>
+              <div class="cert-field-group is-full">
+                <label for="cat-dept-desc" class="cert-field-label">Deskripsi Program (Inggris)</label>
+                <textarea id="cat-dept-desc" class="cert-field-control" rows="2"
+                  placeholder="The program covered food preparation, kitchen hygiene, and menu production."></textarea>
+              </div>
+              <div class="cert-field-group is-full">
+                <label for="cat-dept-comp" class="cert-field-label">Daftar Kompetensi (1 per baris)</label>
+                <textarea id="cat-dept-comp" class="cert-field-control" rows="4"
+                  placeholder="Basic cooking techniques&#10;Food safety (HACCP)&#10;Food plating"></textarea>
+              </div>
+            </div>
+            <div class="cert-catalog-form-actions">
+              <button type="submit" id="btn-cat-dept-save" class="btn cert-btn-primary btn-sm">Simpan Departemen</button>
+              <button type="button" id="btn-cat-dept-new" class="btn btn-secondary btn-sm">Tambah Baru</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section id="panel-catalog-prog" class="cert-catalog-panel hidden" role="tabpanel" aria-labelledby="tab-catalog-prog">
+        <div class="cert-catalog-layout">
+          <div class="cert-catalog-list-wrap">
+            <div id="catalog-prog-list" class="cert-catalog-list"></div>
+          </div>
+          <form id="form-catalog-prog" class="cert-catalog-form" novalidate>
+            <input type="hidden" id="cat-prog-id">
+            <div class="cert-form-grid">
+              <div class="cert-field-group">
+                <label for="cat-prog-code" class="cert-field-label">Kode Program</label>
+                <input type="text" id="cat-prog-code" class="cert-field-control font-mono"
+                  autocorrect="off" autocapitalize="none" spellcheck="false"
+                  maxlength="12" placeholder="OJT" required>
+              </div>
+              <div class="cert-field-group">
+                <label for="cat-prog-months" class="cert-field-label">Durasi Default (Bulan)</label>
+                <input type="number" id="cat-prog-months" class="cert-field-control" min="1" max="36" value="3" required>
+              </div>
+              <div class="cert-field-group is-full">
+                <label for="cat-prog-name" class="cert-field-label">Frasa Program (Inggris)</label>
+                <input type="text" id="cat-prog-name" class="cert-field-control"
+                  placeholder="on-the-job training program" required>
+              </div>
+              <div class="cert-field-group is-full">
+                <label for="cat-prog-desc" class="cert-field-label">Keterangan</label>
+                <textarea id="cat-prog-desc" class="cert-field-control" rows="2"
+                  placeholder="Belajar langsung sambil bekerja di bawah supervisor"></textarea>
+              </div>
+            </div>
+            <div class="cert-catalog-form-actions">
+              <button type="submit" id="btn-cat-prog-save" class="btn cert-btn-primary btn-sm">Simpan Jenis Program</button>
+              <button type="button" id="btn-cat-prog-new" class="btn btn-secondary btn-sm">Tambah Baru</button>
+            </div>
+          </form>
+        </div>
+      </section>
+    </div>
   </dialog>
 
   <div id="cert-print-stage" aria-hidden="true"></div>

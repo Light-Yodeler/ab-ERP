@@ -11,6 +11,35 @@ Kategori yang dipakai: `Added` (fitur baru), `Changed` (perilaku berubah), `Fixe
 
 ---
 
+## [1.8.0] - 2026-11-22
+
+### Added
+* **Katalog Departemen & Jenis Program di SQLite (`departments`, `program_types`)** (`src-tauri/src/db.rs`, `src-tauri/src/commands.rs`, `src-tauri/src/lib.rs`, `src/index.html`, `src/app.js`, `src/style.css`): Menambahkan tabel database `departments` (10 departemen awal: `KIT`, `FB`, `BAR`, `FO`, `HK`, `MNT`, `SM`, `ADM`, `SEC`, `SPA`) beserta deskripsi program berbahasa Inggris (`The program covered ...`) dan daftar kompetensi berbahasa Inggris per departemen, serta `program_types` (7 jenis program: `OJT`, `INT`, `APP`, `MT`, `WS`, `REF`, `CERT`) beserta durasi bawaannya, lengkap dengan modal admin `#dialog-cert-catalog` berstatus dan konfirmasi inline aman Top Layer.
+* **Panel Kriteria & Kompetensi Departemen** (`src/index.html`, `src/app.js`): Pemilihan departemen pada formulir otomatis memunculkan deskripsi program bahasa Inggris yang menyatu natural (termasuk penggabungan rotasi multi-divisi) dan daftar kompetensi berbahasa Inggris khusus departemen lengkap dengan sinkronisasi dropdown predikat dan penghitung kesesuaian total durasi rotasi.
+* **Penomoran Otomatis Berkode Departemen, Rotasi (`ROT`) & Bulan Romawi** (`src-tauri/src/db.rs`, `certificate_sequences`): Penomoran otomatis berbasis transaksi SQLite dengan format `NNN/ABR-{KODE}/{BULAN_ROMAWI}/{TAHUN}` (1 departemen memakai kode departemen seperti `004/ABR-FO/XI/2025`, rotasi 2+ departemen memakai kode `ABR-ROT`, dan tanpa departemen `001/ABR/XI/2026`), menggunakan penanda `certificate_sequences(year, last_seq)` agar urutan selalu naik per tahun tanpa memakai ulang nomor yang dihapus.
+* **Baris Terbit `Issued in [kota], on [tanggal]`** (`src-tauri/src/certificate.rs`, `src/index.html`, `src/app.js`): Menambahkan pengaturan dan kolom formulir `issued_city` (`certIssuedCity`, default `Kuta, Lombok`) serta merender `Issued in Kuta, Lombok, on [tanggal]` di bawah badan sertifikat tanpa bertabrakan dengan tanda tangan digital.
+* **Normalisasi Nama Penerima & Gelar** (`normalize_recipient_name` di `src-tauri/src/certificate.rs`): Merapikan huruf kapital nama dari input huruf kecil atau kapstok ALL CAPS, mempertahankan gelar depan (`dr.`, `drg.`, `Dr.`, `Prof.`, `H.`, `Hj.`, `K.H.`, `TGH.`), kata pertama pasca gelar (`H. La Ode`), partikel (`bin`, `binti`, dll.), apostrof (`Ma'ruf` vs `O'Connor`), tanda hubung, serta gelar akademik/vokasi dan spesialis bertitik (`A.Md.Par.`, `S.Tr.Par.`, `S.Par.`, `S.E.`, `M.M.`, `MBA`, `Ph.D.`, `Sp.PD`).
+* **Template Kalimat Sertifikat Bervariabel** (`render_body_template` di `src-tauri/src/certificate.rs`, `#cfg-cert-template`, `#cert-body-template`): Menyusun kalimat sertifikat secara dinamis dari template default `"for successfully completing the {durasi} {jenis_program} in the {departemen} at {properti}, from {mulai} to {selesai}."` (mendukung variabel `{tanggal_mulai}` / `{tanggal_selesai}`, meruntuhkan `"in the {departemen}"` saat tanpa departemen, serta meringkas rentang satu hari menjadi `on {mulai}`).
+
+### Changed
+* **Konsistensi Tanggal & Perbaikan UI Header/Tabel** (`src/index.html`, `src/style.css`, `src/app.js`): Menyeragamkan tampilan tanggal riwayat sertifikat menjadi `DD/MM/YYYY` tanpa terpotong ke dua baris (`.cert-cell-nowrap`), memperluas kolom durasi divisi agar placeholder terbaca utuh, serta merapikan subjudul bilah navigasi `.brand-subtitle` agar tidak terpotong.
+* **Kunci Nomor Pasca Terbit, Validasi Blokir Durasi Divisi & Kalimat Kompetensi Utuh** (`src-tauri/src/db.rs`, `src/app.js`, `src/style.css`, `src/index.html`, `tests/certificate_tests.rs`):
+  * Mengubah `formatCompetencySentence()` menjadi kalimat mandiri utuh `"The trainee demonstrated competence in ..."` dengan penanganan daftar 1, 2, dan 3+ item yang menghindari ambiguitas konjungsi internal (`", as well as "` atau pemisah `;`), serta merapikan kompetensi bawaan `KIT` (`Food plating`) dan `MNT` (`Pool & garden upkeep`).
+  * Mengunci permanen `certificate_no` setelah sertifikat diterbitkan di backend (`db::update_certificate()`) maupun antarmuka (`setCertNoLocked()`) agar pengubahan dari 1 departemen ke rotasi pasca terbit tidak mengubah kode nomor resmi.
+  * Menegakkan kebijakan durasi divisi (`validate_division_durations()` di backend dan `updateDivisionDurationBalance()`/`validateCertificateForm()` di frontend): penyimpanan diblokir bila total durasi per divisi melebihi periode utama, sedangkan total yang lebih singkat tetap diizinkan sebagai peringatan non-blokir.
+* **Migrasi Otomatis, Audit Fixes & Pengujian Regresi `FEAT-10`** (`src-tauri/src/db.rs`, `src-tauri/src/certificate.rs`, `src/app.js`, `tests/certificate_tests.rs`): Menambahkan kolom `department_code`, `program_type_code`, `issued_city`, dan `body_template` ke tabel `training_certificates` melalui migrasi idempoten bagi database lama sekaligus memperbarui deskripsi/kompetensi bawaan tanpa menimpa suntingan pengguna, mempertahankan `sort_order` saat edit katalog, memperketat parser urutan nomor dan penjaga overflow, melindungi `staff` dari klik simpan ganda, serta memperluas test suite untuk seluruh katalog, rotasi 2-3 divisi, urutan nomor persisten, normalisasi gelar, dan template bervariabel.
+
+## [1.7.5] - 2026-11-22
+
+### Fixed
+* Perlindungan draf formulir **Sertifikat Training (`FEAT-10`)** agar data yang belum disimpan tidak hilang saat keluar aplikasi maupun saat meninjau arsip sertifikat lain (`src/app.js`, `src/index.html`, `src/style.css`, `docs/FEATURES.md`):
+  * **Auto-Save Draf Per Akun ke `localStorage`:** Setiap perubahan input formulir kini otomatis disimpan ke `anda_erp_cert_draft_<username>` secara lokal dan ikut disimpan ulang pada `pagehide`/`beforeunload`. Ketika pengguna membuka kembali tab Sertifikat Training setelah keluar aplikasi atau logout, draf yang belum disimpan dipulihkan secara otomatis (sambil tetap memakai nomor urut terbaru bila nomor sebelumnya memakai penomoran otomatis) lengkap dengan indikator **Belum Disimpan**.
+  * **Pratinjau Arsip Non-Destruktif:** Klik **Pratinjau** pada tabel riwayat kini hanya menampilkan sertifikat arsip pada panel pratinjau kanan dengan spanduk informasi **Pratinjau Arsip** dan tombol **Kembali ke Form**, tanpa menimpa isi formulir yang sedang diketik di sisi kiri; tombol **Simpan PDF**, **Cetak**, dan **Unduh PNG** otomatis mengikuti arsip atau draf yang sedang tampil.
+  * **Konfirmasi Pembuangan & Pengingat Ekspor:** Tombol **Baru / Reset**, **Batal Edit**, aksi **Edit** sertifikat lain saat formulir masih kotor, dan tombol **Keluar** (`logout()`) kini meminta konfirmasi terlebih dahulu melalui dialog aplikasi; ekspor/cetak langsung dari draf yang belum tersimpan turut menampilkan pengingat untuk menyimpannya ke database.
+
+
+---
+
 ## [1.7.4] - 2026-11-22
 
 ### Fixed

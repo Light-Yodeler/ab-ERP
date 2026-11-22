@@ -72,19 +72,25 @@ Seluruh pemanggilan dari antarmuka pengguna dilakukan melalui pembungkus `invoke
 | `update_unit` | `{ id, name, defaultNpwpd?, defaultAddress?, isActive }` | `()` | Memperbarui data unit usaha |
 | `get_certificates` | `{ year?, status?, search?, page?, pageSize? }` | `PaginatedCertificates` | Mengambil riwayat sertifikat training dengan filter tahun, status, pencarian, dan paginasi |
 | `get_certificate_years` | `{}` | `Vec<String>` | Mengambil daftar tahun terbit sertifikat unik menurun |
-| `get_next_certificate_no` | `{ year? }` | `String` | Menghasilkan nomor urut `000/ABR/YYYY` berikutnya untuk tahun tertentu |
-| `create_certificate` | `{ payload }` | `TrainingCertificateRow` | Memvalidasi dan menyimpan sertifikat training baru ke SQLite |
-| `update_certificate` | `{ id, payload }` | `TrainingCertificateRow` | Memperbarui data sertifikat tersimpan (khusus Admin) |
+| `get_next_certificate_no` | `{ year?, month?, departmentCode? }` | `String` | Menghasilkan pratinjau nomor urut `NNN/ABR-{DEPT}/{ROMAWI}/{TAHUN}` berikutnya |
+| `create_certificate` | `{ payload }` | `TrainingCertificateRow` | Memvalidasi, mengalokasikan nomor urut atomik bila otomatis, dan menyimpan sertifikat baru |
+| `update_certificate` | `{ id, payload }` | `TrainingCertificateRow` | Memperbarui data sertifikat tersimpan dengan `certificate_no` terkunci pasca terbit dan validasi durasi divisi (khusus Admin) |
 | `set_certificate_status` | `{ id, status }` | `TrainingCertificateRow` | Mengubah status sertifikat `active` atau `revoked` (khusus Admin) |
 | `delete_certificate` | `{ id }` | `()` | Menghapus permanen rekaman sertifikat (khusus Admin) |
 | `preview_certificate_svg` | `{ payload }` | `String` | Menghasilkan dokumen SVG kanonik F4/A4 untuk pratinjau langsung |
 | `export_certificate_pdf` | `{ payload }` | `String` | Mengekspor sertifikat PDF vektor presisi milimeter lewat dialog simpan berkas |
 | `export_certificate_png` | `{ payload }` | `String` | Mengekspor gambar PNG resolusi 300 DPI lewat dialog simpan berkas |
-| `get_certificate_settings` | `{}` | `CertificateSettingsPayload` | Mengambil pengaturan penandatangan bawaan, kertas, dan URI pratinjau logo/tanda tangan |
-| `update_certificate_settings` | `{ signerName, signerTitle, programName, paperSize, showSignature }` | `CertificateSettingsPayload` | Menyimpan pengaturan default sertifikat (khusus Admin) |
+| `get_certificate_settings` | `{}` | `CertificateSettingsPayload` | Mengambil pengaturan penandatangan bawaan, kota terbit, template kalimat, kertas, dan URI aset |
+| `update_certificate_settings` | `{ signerName, signerTitle, programName, paperSize, showSignature, issuedCity?, bodyTemplate? }` | `CertificateSettingsPayload` | Menyimpan pengaturan default sertifikat (khusus Admin) |
 | `upload_certificate_asset` | `{ kind }` | `CertificateSettingsPayload` | Memvalidasi magic byte/ukuran dan mengunggah aset PNG/JPEG `logo` atau `signature` (khusus Admin) |
 | `clear_certificate_asset` | `{ kind }` | `CertificateSettingsPayload` | Menghapus aset kustom dan kembali ke logo bawaan / tanda tangan basah (khusus Admin) |
 | `print_certificate` | `{ title? }` | `()` | Membuka dialog pencetakan sistem landscape tanpa margin (borderless) untuk sertifikat |
+| `get_departments` | `{}` | `Vec<DepartmentRow>` | Mengambil daftar departemen hospitality beserta deskripsi program dan daftar kompetensinya |
+| `save_department` | `{ payload }` | `DepartmentRow` | Menambah atau memperbarui data departemen hospitality (khusus Admin) |
+| `delete_department` | `{ id }` | `()` | Menghapus departemen hospitality dari database (khusus Admin) |
+| `get_program_types` | `{}` | `Vec<ProgramTypeRow>` | Mengambil daftar jenis program pelatihan beserta durasi standarnya |
+| `save_program_type` | `{ payload }` | `ProgramTypeRow` | Menambah atau memperbarui jenis program sertifikat (khusus Admin) |
+| `delete_program_type` | `{ id }` | `()` | Menghapus jenis program sertifikat dari database (khusus Admin) |
 
 ---
 
@@ -190,7 +196,7 @@ CREATE INDEX IF NOT EXISTS idx_room_res_trans_id ON room_reservations(transactio
 ```
 
 ### Tabel `training_certificates`
-Menyimpan riwayat sertifikat training peserta, nomor unik tahunan, periode, status, dan snapshot penandatangan/ukuran kertas.
+Menyimpan riwayat sertifikat training peserta, nomor unik tahunan, kode departemen dan jenis program, kota terbit, snapshot template kalimat, status, dan ukuran kertas.
 ```sql
 CREATE TABLE IF NOT EXISTS training_certificates (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -209,6 +215,10 @@ CREATE TABLE IF NOT EXISTS training_certificates (
     signer_title TEXT NOT NULL DEFAULT 'General Manager',
     paper_size TEXT NOT NULL DEFAULT 'F4' CHECK(paper_size IN ('F4', 'A4')),
     status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'revoked')),
+    department_code TEXT,
+    program_type_code TEXT,
+    issued_city TEXT,
+    body_template TEXT,
     created_by TEXT,
     created_at DATETIME DEFAULT (datetime('now', 'localtime')),
     updated_at DATETIME DEFAULT (datetime('now', 'localtime'))
@@ -216,6 +226,45 @@ CREATE TABLE IF NOT EXISTS training_certificates (
 CREATE INDEX IF NOT EXISTS idx_cert_issued_date ON training_certificates(issued_date);
 CREATE INDEX IF NOT EXISTS idx_cert_status ON training_certificates(status);
 CREATE INDEX IF NOT EXISTS idx_cert_recipient ON training_certificates(recipient_name);
+```
+
+### Tabel `departments`
+Menyimpan katalog departemen hospitality yang dapat ditambah, diubah, atau dihapus, lengkap dengan deskripsi program dan daftar kompetensi per departemen.
+```sql
+CREATE TABLE IF NOT EXISTS departments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    name TEXT NOT NULL,
+    program_description TEXT NOT NULL DEFAULT '',
+    competencies TEXT NOT NULL DEFAULT '',
+    is_active INTEGER NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT (datetime('now', 'localtime'))
+);
+```
+
+### Tabel `program_types`
+Menyimpan daftar jenis program sertifikat (mis. OJT, Internship, Workshop) beserta durasi standar dan keterangannya.
+```sql
+CREATE TABLE IF NOT EXISTS program_types (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    name TEXT NOT NULL,
+    default_duration_months INTEGER NOT NULL DEFAULT 3,
+    description TEXT NOT NULL DEFAULT '',
+    is_active INTEGER NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT (datetime('now', 'localtime'))
+);
+```
+
+### Tabel `certificate_sequences`
+Menyimpan batas urutan tertinggi nomor sertifikat per tahun (`last_seq`) secara persisten di SQLite agar penomoran otomatis selalu monoton naik dan tidak pernah menduplikasi atau memakai ulang nomor yang telah terbit.
+```sql
+CREATE TABLE IF NOT EXISTS certificate_sequences (
+    year INTEGER PRIMARY KEY,
+    last_seq INTEGER NOT NULL DEFAULT 0
+);
 ```
 
 ---

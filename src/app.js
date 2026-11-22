@@ -266,6 +266,8 @@
         signer_title: 'General Manager',
         program_name: 'hospitality training program',
         paper_size: 'F4',
+        issued_city: 'Kuta, Lombok',
+        body_template: 'for successfully completing the {durasi} {jenis_program} in the {departemen} at {properti}, from {mulai} to {selesai}.',
         show_signature: false,
         has_custom_logo: false,
         has_custom_signature: false,
@@ -273,9 +275,81 @@
         signature_data_uri: null,
       };
     }
+    if (cmd === 'get_departments') {
+      if (!window.__mockDepartments) {
+        window.__mockDepartments = [
+          { id: 1, code: 'KIT', name: 'Kitchen', program_description: 'The program covered food preparation, kitchen hygiene, and menu production.', competencies: 'Basic cooking techniques\nFood safety (HACCP)\nIngredient handling\nFood plating', is_active: true, sort_order: 10 },
+          { id: 2, code: 'FB', name: 'Food & Beverage Service', program_description: 'The program covered restaurant service, guest handling, and table setup.', competencies: 'Table service\nMenu knowledge\nGuest complaint handling\nUpselling techniques', is_active: true, sort_order: 20 },
+          { id: 3, code: 'BAR', name: 'Bar', program_description: 'The program covered beverage preparation and bar operations.', competencies: 'Beverage preparation\nProduct knowledge\nBar inventory control', is_active: true, sort_order: 30 },
+          { id: 4, code: 'FO', name: 'Front Office', program_description: 'The program covered guest reception, reservations, and check-in/check-out procedures.', competencies: 'Guest registration\nReservation systems\nGuest communication\nPayment handling', is_active: true, sort_order: 40 },
+          { id: 5, code: 'HK', name: 'Housekeeping', program_description: 'The program covered room preparation, cleanliness standards, and laundry operations.', competencies: 'Room cleanliness standards\nBed making\nLinen handling\nPublic area maintenance', is_active: true, sort_order: 50 },
+          { id: 6, code: 'MNT', name: 'Maintenance / Engineering', program_description: 'The program covered facility upkeep and basic technical repairs.', competencies: 'Electrical maintenance\nPlumbing repairs\nAir conditioning maintenance\nPool & garden upkeep', is_active: true, sort_order: 60 },
+          { id: 7, code: 'SM', name: 'Sales & Marketing', program_description: 'The program covered promotional campaigns, online booking channels, and guest engagement.', competencies: 'Social media management\nOTA channel management (Booking.com, Agoda)\nGuest inquiry handling', is_active: true, sort_order: 70 },
+          { id: 8, code: 'ADM', name: 'Administration / Accounting', program_description: 'The program covered hotel administration, cashiering, and basic bookkeeping.', competencies: 'Transaction recording\nInvoicing\nDaily financial reporting', is_active: true, sort_order: 80 },
+          { id: 9, code: 'SEC', name: 'Security', program_description: 'The program covered guest safety, emergency response, and property security procedures.', competencies: 'Property patrols\nEmergency procedures\nAccess control', is_active: true, sort_order: 90 },
+          { id: 10, code: 'SPA', name: 'Spa & Recreation', program_description: 'The program covered spa treatments and guest activity coordination.', competencies: 'Spa treatment techniques\nEquipment sanitation\nGuest activity coordination', is_active: true, sort_order: 100 },
+        ];
+      }
+      return [...window.__mockDepartments];
+    }
+    if (cmd === 'save_department') {
+      const p = args.payload || {};
+      const list = window.__mockDepartments || [];
+      if (p.id) {
+        const idx = list.findIndex((d) => d.id === p.id);
+        if (idx >= 0) {
+          list[idx] = { ...list[idx], ...p, code: String(p.code || '').toUpperCase() };
+          return list[idx];
+        }
+      }
+      const nextId = list.reduce((m, d) => Math.max(m, d.id), 0) + 1;
+      const created = { id: nextId, code: String(p.code || '').toUpperCase(), name: p.name || '', program_description: p.program_description || '', competencies: p.competencies || '', is_active: true, sort_order: nextId * 10 };
+      list.push(created);
+      return created;
+    }
+    if (cmd === 'delete_department') {
+      window.__mockDepartments = (window.__mockDepartments || []).filter((d) => d.id !== args.id);
+      return;
+    }
+    if (cmd === 'get_program_types') {
+      if (!window.__mockProgramTypes) {
+        window.__mockProgramTypes = [
+          { id: 1, code: 'OJT', name: 'on-the-job training program', default_duration_months: 6, description: 'Belajar langsung sambil bekerja di bawah supervisor', is_active: true, sort_order: 10 },
+          { id: 2, code: 'INT', name: 'internship program', default_duration_months: 3, description: 'Magang terstruktur, sering bagian dari kurikulum kampus', is_active: true, sort_order: 20 },
+          { id: 3, code: 'APP', name: 'apprenticeship program', default_duration_months: 6, description: 'Pelatihan jangka panjang dengan jenjang keterampilan', is_active: true, sort_order: 30 },
+          { id: 4, code: 'MT', name: 'management trainee program', default_duration_months: 6, description: 'Rotasi antar departemen untuk calon pemimpin', is_active: true, sort_order: 40 },
+          { id: 5, code: 'WS', name: 'short course / workshop', default_duration_months: 1, description: 'Pelatihan singkat topik tertentu (1-5 hari)', is_active: true, sort_order: 50 },
+          { id: 6, code: 'REF', name: 'refresher / skill upgrade program', default_duration_months: 1, description: 'Penyegaran keterampilan atau standar baru', is_active: true, sort_order: 60 },
+          { id: 7, code: 'CERT', name: 'certification course', default_duration_months: 1, description: 'Pelatihan dengan ujian (food safety, first aid, fire safety)', is_active: true, sort_order: 70 },
+        ];
+      }
+      return [...window.__mockProgramTypes];
+    }
+    if (cmd === 'save_program_type') {
+      const p = args.payload || {};
+      const list = window.__mockProgramTypes || [];
+      if (p.id) {
+        const idx = list.findIndex((d) => d.id === p.id);
+        if (idx >= 0) {
+          list[idx] = { ...list[idx], ...p, code: String(p.code || '').toUpperCase() };
+          return list[idx];
+        }
+      }
+      const nextId = list.reduce((m, d) => Math.max(m, d.id), 0) + 1;
+      const created = { id: nextId, code: String(p.code || '').toUpperCase(), name: p.name || '', default_duration_months: Number(p.default_duration_months) || 3, description: p.description || '', is_active: true, sort_order: nextId * 10 };
+      list.push(created);
+      return created;
+    }
+    if (cmd === 'delete_program_type') {
+      window.__mockProgramTypes = (window.__mockProgramTypes || []).filter((d) => d.id !== args.id);
+      return;
+    }
     if (cmd === 'get_next_certificate_no') {
+      const romans = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
       const y = args.year || new Date().getFullYear();
-      return `001/ABR/${y}`;
+      const mIdx = Math.max(1, Math.min(12, Number(args.month) || (new Date().getMonth() + 1))) - 1;
+      const dept = args.departmentCode ? `-${String(args.departmentCode).toUpperCase()}` : '';
+      return `001/ABR${dept}/${romans[mIdx]}/${y}`;
     }
     if (cmd === 'get_certificate_years') {
       return [String(new Date().getFullYear())];
@@ -306,8 +380,11 @@
       };
       const deptItems = String(p.department || '').split(';').map(s => s.trim()).filter(Boolean).map(fmtMockDept);
       const divLine = deptItems.length ? `in ${escapeHtml(deptItems.join(' and '))}` : '';
-      const achLine = p.achievement_text ? `<text x="${cx}" y="157" text-anchor="middle" font-size="3.7" fill="#000000">${escapeHtml(p.achievement_text)}</text>` : '';
-      return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}mm" height="${h}mm" viewBox="0 0 ${w} ${h}"><rect x="0" y="0" width="${w}" height="${h}" fill="#FFFFFF"/><rect x="10" y="10" width="${w - 20}" height="${h - 20}" fill="none" stroke="#C67D24" stroke-width="0.53"/><text x="${w - 20}" y="21.25" text-anchor="end" font-size="3.53" fill="#545454">Certificate No. ${escapeHtml(p.certificate_no || '[000/ABR/YYYY]')}</text><text x="${cx}" y="86" text-anchor="middle" font-size="14" fill="#1F1F1F">Certificate of Completion</text><text x="${cx}" y="130" text-anchor="middle" font-weight="700" font-size="12" fill="#000000">${escapeHtml(p.recipient_name || '[Recipient Name]')}</text><text x="${cx}" y="149" text-anchor="middle" font-size="3.8" fill="#000000">${divLine}</text>${achLine}</svg>`;
+      const achLine = p.achievement_text ? `<text x="${cx}" y="156" text-anchor="middle" font-size="3.6" fill="#000000">${escapeHtml(p.achievement_text)}</text>` : '';
+      const issuedLine = p.issued_date
+        ? `<text x="${cx}" y="164" text-anchor="middle" font-size="3.3" fill="#3F3F46">${p.issued_city ? `Issued in ${escapeHtml(p.issued_city)}, on ${escapeHtml(p.issued_date)}` : `Issued on ${escapeHtml(p.issued_date)}`}</text>`
+        : '';
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}mm" height="${h}mm" viewBox="0 0 ${w} ${h}"><rect x="0" y="0" width="${w}" height="${h}" fill="#FFFFFF"/><rect x="10" y="10" width="${w - 20}" height="${h - 20}" fill="none" stroke="#C67D24" stroke-width="0.53"/><text x="${w - 20}" y="21.25" text-anchor="end" font-size="3.53" fill="#545454">Certificate No. ${escapeHtml(p.certificate_no || '[000/ABR/I/YYYY]')}</text><text x="${cx}" y="86" text-anchor="middle" font-size="14" fill="#1F1F1F">Certificate of Completion</text><text x="${cx}" y="130" text-anchor="middle" font-weight="700" font-size="12" fill="#000000">${escapeHtml(p.recipient_name || '[Recipient Name]')}</text><text x="${cx}" y="148" text-anchor="middle" font-size="3.8" fill="#000000">${divLine}</text>${achLine}${issuedLine}</svg>`;
     }
     if (cmd === 'print_certificate') {
       window.print();
@@ -349,11 +426,17 @@
     certEditingStatus: 'active',
     certManualNo: false,
     certManualDuration: false,
+    certManualDates: false,
+    certStaffSavedLock: false,
     certInitialized: false,
     certSettings: null,
+    certDepartments: [],
+    certProgramTypes: [],
     certRows: [],
     certPreviewTimer: null,
     certPreviewSeq: 0,
+    certCleanSnapshot: '',
+    certPreviewRow: null,
     // Optimizer Module State
     optFilePath: null,
     optAnalysis: null,
@@ -520,6 +603,10 @@
     if (btnCertSettings) {
       btnCertSettings.classList.toggle('hidden', !isAdmin);
     }
+    const btnCertCatalog = document.getElementById('btn-cert-catalog');
+    if (btnCertCatalog) {
+      btnCertCatalog.classList.toggle('hidden', !isAdmin);
+    }
     if (state.certInitialized) {
       renderCertificateHistoryRows();
     }
@@ -628,7 +715,18 @@
     }
   }
 
-  function logout() {
+  async function logout() {
+    if (isCertFormDirty()) {
+      saveCertDraftToStorage();
+      const proceed = await appConfirm(
+        'Ada draf sertifikat yang belum disimpan ke database. Tetap keluar? (Draf tetap disimpan sementara di perangkat ini untuk akun Anda.)',
+        'Draf Sertifikat Belum Disimpan',
+        'warning',
+        'Tetap Keluar',
+        'Kembali'
+      );
+      if (!proceed) return;
+    }
     resetCertificatesSessionState();
     document.title = APP_DEFAULT_TITLE;
     if (isTauri) {
@@ -3251,24 +3349,30 @@
   // =========================================================================
   // 10. Module 6: Generator & Arsip Sertifikat Training (FEAT-10)
   // =========================================================================
+  const DEFAULT_CERT_BODY_TEMPLATE = 'for successfully completing the {durasi} {jenis_program} in the {departemen} at {properti}, from {mulai} to {selesai}.';
+  const DEFAULT_CERT_ISSUED_CITY = 'Kuta, Lombok';
+
   function suggestEnglishDuration(startIso, endIso) {
     const words = [
-      'one-month', 'two-month', 'three-month', 'four-month',
-      'five-month', 'six-month', 'seven-month', 'eight-month',
-      'nine-month', 'ten-month', 'eleven-month', 'twelve-month',
+      'one', 'two', 'three', 'four', 'five', 'six',
+      'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve',
     ];
     if (!startIso || !endIso) return 'three-month';
     const s = new Date(`${startIso}T00:00:00`);
     const e = new Date(`${endIso}T00:00:00`);
     if (isNaN(s.getTime()) || isNaN(e.getTime())) return 'three-month';
     const days = Math.round((e - s) / 86400000);
-    if (days <= 0) return 'one-month';
+    if (days < 0) return 'one-day';
+    if (days <= 5) {
+      const inclusiveDays = days + 1;
+      return `${words[inclusiveDays - 1] || inclusiveDays}-day`;
+    }
     if (days < 28) {
-      const weeks = Math.max(1, Math.ceil(days / 7));
-      return `${weeks}-week`;
+      const weeks = Math.max(1, Math.round(days / 7));
+      return `${words[weeks - 1] || weeks}-week`;
     }
     const months = Math.max(1, Math.round(days / 30.4375));
-    return months <= 12 ? words[months - 1] : `${months}-month`;
+    return months <= 12 ? `${words[months - 1]}-month` : `${months}-month`;
   }
 
   function showCertStatus(message, type = 'info') {
@@ -3336,35 +3440,347 @@
     const formatted = [];
     document.querySelectorAll('#cert-divisions-list .cert-division-row').forEach((rowEl) => {
       const name = (rowEl.querySelector('.cert-div-name')?.value || '').trim();
-      const duration = (rowEl.querySelector('.cert-div-duration')?.value || '').trim();
+      const rawDuration = (rowEl.querySelector('.cert-div-duration')?.value || '').trim();
+      const cleanDur = rawDuration.replace(/[()]/g, '').trim();
       if (!name) return;
-      formatted.push(duration ? `${name} (${duration})` : name);
+      formatted.push(cleanDur ? `${name} (${cleanDur})` : name);
     });
     return formatted.length ? formatted.join('; ') : null;
+  }
+
+  function findDepartmentByNameOrCode(val) {
+    const q = String(val || '').trim().toLowerCase();
+    if (!q) return null;
+    const stripped = q.replace(/\s+department$/i, '').trim();
+    return (
+      (state.certDepartments || []).find(
+        (d) =>
+          d.name.toLowerCase() === q ||
+          d.name.toLowerCase() === stripped ||
+          d.code.toLowerCase() === q
+      ) || null
+    );
+  }
+
+  function getSelectedDepartmentCode() {
+    const selected = Array.from(
+      document.querySelectorAll('#cert-divisions-list .cert-division-row .cert-div-name')
+    ).filter((el) => el.value.trim());
+    if (selected.length >= 2) return 'ROT';
+    if (selected.length === 1) {
+      const dept = findDepartmentByNameOrCode(selected[0].value);
+      return dept ? dept.code : null;
+    }
+    return null;
+  }
+
+  function extractCoveredClause(desc) {
+    const trimmed = String(desc || '').trim().replace(/[.!?]+$/, '').trim();
+    if (!trimmed) return '';
+    if (/^the program covered\s+/i.test(trimmed)) {
+      return trimmed.replace(/^the program covered\s+/i, '').trim();
+    }
+    if (/^training in\s+/i.test(trimmed)) {
+      return trimmed.replace(/^training in\s+/i, '').trim();
+    }
+    return trimmed;
+  }
+
+  function combineDeptDescriptions(depts) {
+    const cleanDepts = (depts || []).filter((d) => String(d.program_description || '').trim());
+    if (cleanDepts.length === 0) return '';
+    if (cleanDepts.length === 1) {
+      const raw = String(cleanDepts[0].program_description).trim();
+      if (/^training in\s+/i.test(raw)) {
+        const clause = extractCoveredClause(raw);
+        return `The program covered ${clause}.`;
+      }
+      return /[.!?]$/.test(raw) ? raw : `${raw}.`;
+    }
+    const clauses = cleanDepts.map((d) => extractCoveredClause(d.program_description)).filter(Boolean);
+    if (clauses.length === 0) return '';
+    if (clauses.length === 1) return `The program covered ${clauses[0]}.`;
+    const head = clauses.slice(0, -1).join('; ');
+    const last = clauses[clauses.length - 1];
+    return `The program covered ${head}; as well as ${last}.`;
+  }
+
+  function lowercaseLeadingWordExceptAcronym(phrase) {
+    const trimmed = String(phrase || '').trim();
+    if (!trimmed) return '';
+    const firstBreak = trimmed.search(/[\s(]/);
+    const firstWord = firstBreak === -1 ? trimmed : trimmed.slice(0, firstBreak);
+    if (/^[A-Z0-9.]{2,}$/.test(firstWord) || /^(Booking\.com|Agoda)$/i.test(firstWord)) {
+      return trimmed;
+    }
+    return `${trimmed[0].toLowerCase()}${trimmed.slice(1)}`;
+  }
+
+  const DEFAULT_CERT_NO_HINT = 'Format otomatis: 001/ABR-FO/XI/2026 (kode departemen & bulan Romawi, urutan unik per tahun)';
+
+  function setCertNoLocked(locked) {
+    const isLocked = Boolean(locked);
+    const noInput = document.getElementById('cert-no');
+    const autoBtn = document.getElementById('btn-cert-auto-no');
+    const hintEl = document.getElementById('cert-no-hint');
+    if (noInput) {
+      noInput.readOnly = isLocked;
+      noInput.classList.toggle('is-locked', isLocked);
+      noInput.setAttribute('aria-readonly', isLocked ? 'true' : 'false');
+    }
+    if (autoBtn) autoBtn.disabled = isLocked;
+    if (hintEl) {
+      hintEl.textContent = isLocked
+        ? 'Terkunci permanen: nomor sertifikat tidak berubah setelah diterbitkan (termasuk jika departemen diubah menjadi rotasi).'
+        : DEFAULT_CERT_NO_HINT;
+    }
+  }
+
+  function formatCompetencySentence(items) {
+    const normalized = (items || [])
+      .map((it) => lowercaseLeadingWordExceptAcronym(it).replace(/[.,;]+$/, '').trim())
+      .filter(Boolean);
+    if (normalized.length === 0) return '';
+    if (normalized.length === 1) return `The trainee demonstrated competence in ${normalized[0]}.`;
+    if (normalized.length === 2) {
+      const hasAnd = normalized.some((item) => /\band\b/i.test(item));
+      return hasAnd
+        ? `The trainee demonstrated competence in ${normalized[0]}, as well as ${normalized[1]}.`
+        : `The trainee demonstrated competence in ${normalized[0]} and ${normalized[1]}.`;
+    }
+    const needsSemicolon = normalized.some((item) => /[,;]/.test(item) || /\band\b/i.test(item));
+    const head = normalized.slice(0, -1);
+    const last = normalized[normalized.length - 1];
+    return needsSemicolon
+      ? `The trainee demonstrated competence in ${head.join('; ')}; and ${last}.`
+      : `The trainee demonstrated competence in ${head.join(', ')}, and ${last}.`;
+  }
+
+  function parseDurationToMonths(raw) {
+    const text = String(raw || '').trim().toLowerCase();
+    if (!text) return null;
+    const wordNums = {
+      one: 1, two: 2, three: 3, four: 4, five: 5, six: 6,
+      seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
+    };
+    const m = /^(\d+(?:[.,]\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)[-\s]+(year|years|yr|yrs|tahun|thn|month|months|mo|mos|bulan|bln|week|weeks|wk|wks|minggu|mgg|day|days|hari)\b/.exec(text);
+    if (!m) return null;
+    const num = wordNums[m[1]] ?? parseFloat(m[1].replace(',', '.'));
+    if (!Number.isFinite(num) || num <= 0) return null;
+    const unit = m[2];
+    if (unit.startsWith('year') || unit.startsWith('yr') || unit === 'tahun' || unit === 'thn') return num * 12;
+    if (unit.startsWith('week') || unit.startsWith('wk') || unit === 'minggu' || unit === 'mgg') return num / 4.33;
+    if (unit.startsWith('day') || unit === 'hari') return num / 30.0;
+    return num;
+  }
+
+  function formatMonthsSummary(val) {
+    const rounded = Math.round(val * 10) / 10;
+    return Number.isInteger(rounded) ? `${rounded} bulan` : `${rounded.toFixed(1)} bulan`;
+  }
+
+  function updateDivisionDurationBalance() {
+    const el = document.getElementById('cert-divisions-balance');
+    const emptyState = { exceeded: false, under: false, sumMonths: null, periodMonths: null, message: '' };
+    const rows = readDivisionRowsFromDom().filter((r) => r.name.trim());
+    const withDur = rows.filter((r) => r.duration.trim());
+    if (withDur.length === 0) {
+      if (el) {
+        el.setAttribute('role', 'status');
+        el.className = 'cert-field-hint hidden';
+        el.textContent = '';
+      }
+      return emptyState;
+    }
+
+    let sumMonths = 0;
+    let unparsed = 0;
+    withDur.forEach((r) => {
+      const m = parseDurationToMonths(r.duration);
+      if (m === null) unparsed += 1;
+      else sumMonths += m;
+    });
+
+    const startVal = document.getElementById('cert-start')?.value;
+    const endVal = document.getElementById('cert-end')?.value;
+    const durVal = document.getElementById('cert-duration')?.value;
+    let periodMonths = parseDurationToMonths(durVal);
+    if (periodMonths === null && startVal && endVal) {
+      const s = new Date(`${startVal}T00:00:00`);
+      const e = new Date(`${endVal}T00:00:00`);
+      if (!isNaN(s.getTime()) && !isNaN(e.getTime()) && e >= s) {
+        periodMonths = Math.max(0.1, (e - s) / (86400000 * 30.4375));
+      }
+    }
+
+    const isLockedNo = Boolean(state.certEditingId || document.getElementById('cert-no')?.readOnly);
+    if (periodMonths !== null && sumMonths > periodMonths + 0.35) {
+      const msg = `Error: total durasi divisi (${formatMonthsSummary(sumMonths)}) melebihi periode utama (${formatMonthsSummary(periodMonths)}). Penyimpanan diblokir sampai durasi disesuaikan.`;
+      if (el) {
+        el.className = 'cert-field-hint cert-balance-error';
+        el.setAttribute('role', 'alert');
+        el.textContent = msg;
+      }
+      return { exceeded: true, under: false, sumMonths, periodMonths, message: msg };
+    }
+
+    if (el) el.setAttribute('role', 'status');
+    const rotLockNote = isLockedNo ? 'nomor sertifikat tetap terkunci' : 'kode nomor: ABR-ROT';
+    if (unparsed > 0 || periodMonths === null) {
+      const msg = rows.length >= 2
+        ? `Rotasi ${rows.length} divisi (${rotLockNote}). Pastikan total durasi divisi tidak melebihi periode utama.`
+        : 'Format durasi divisi tidak dikenali; gunakan contoh seperti "3 months" atau "4 weeks".';
+      if (el) {
+        el.className = 'cert-field-hint';
+        el.textContent = msg;
+      }
+      return { exceeded: false, under: false, sumMonths, periodMonths, message: msg };
+    }
+
+    if (sumMonths < periodMonths - 0.35) {
+      const msg = `Peringatan: total durasi divisi (${formatMonthsSummary(sumMonths)}) lebih singkat dari periode utama (${formatMonthsSummary(periodMonths)}). Sertifikat tetap dapat disimpan bila memang demikian.`;
+      if (el) {
+        el.className = 'cert-field-hint cert-balance-warn';
+        el.textContent = msg;
+      }
+      return { exceeded: false, under: true, sumMonths, periodMonths, message: msg };
+    }
+
+    const matchLockNote = isLockedNo ? 'nomor sertifikat terkunci' : 'kode nomor: ABR-ROT';
+    const msg = rows.length >= 2
+      ? `Total durasi ${rows.length} divisi (${formatMonthsSummary(sumMonths)}) sesuai periode utama (${matchLockNote}).`
+      : `Durasi divisi (${formatMonthsSummary(sumMonths)}) sesuai periode utama.`;
+    if (el) {
+      el.className = 'cert-field-hint text-success';
+      el.textContent = msg;
+    }
+    return { exceeded: false, under: false, sumMonths, periodMonths, message: msg };
+  }
+
+  function populateProgramTypeSelect(selectedCode = '') {
+    const select = document.getElementById('cert-program-type');
+    if (!select) return;
+    const list = (state.certProgramTypes || []).filter((p) => p.is_active !== false);
+    const opts = list.map(
+      (pt) =>
+        `<option value="${escapeHtml(pt.code)}">${escapeHtml(pt.code)} &mdash; ${escapeHtml(pt.name)}</option>`
+    );
+    opts.push('<option value="">Kustom (isi manual di Detail Tambahan)</option>');
+    select.innerHTML = opts.join('');
+    if (selectedCode && list.some((p) => p.code.toUpperCase() === selectedCode.toUpperCase())) {
+      const matched = list.find((p) => p.code.toUpperCase() === selectedCode.toUpperCase());
+      select.value = matched.code;
+    } else if (list.length > 0 && selectedCode !== '__custom__') {
+      select.value = list[0].code;
+    } else {
+      select.value = '';
+    }
+  }
+
+  function renderDeptCriteriaPanel() {
+    const panel = document.getElementById('cert-dept-criteria-panel');
+    const titleEl = document.getElementById('cert-dept-criteria-title');
+    const descEl = document.getElementById('cert-dept-criteria-desc');
+    const compContainer = document.getElementById('cert-dept-competencies-list');
+    if (!panel || !titleEl || !descEl || !compContainer) return;
+
+    const seenCodes = new Set();
+    const matchedDepts = [];
+    document.querySelectorAll('#cert-divisions-list .cert-division-row .cert-div-name').forEach((el) => {
+      const dept = findDepartmentByNameOrCode(el.value);
+      if (dept && !seenCodes.has(dept.code)) {
+        seenCodes.add(dept.code);
+        matchedDepts.push(dept);
+      }
+    });
+
+    if (matchedDepts.length === 0) {
+      panel.classList.add('hidden');
+      compContainer.innerHTML = '';
+      return;
+    }
+
+    panel.classList.remove('hidden');
+    const primary = matchedDepts[0];
+    const isLockedNo = Boolean(state.certEditingId || document.getElementById('cert-no')?.readOnly);
+    titleEl.textContent =
+      matchedDepts.length === 1
+        ? `${primary.code} - ${primary.name}`
+        : `Rotasi ${matchedDepts.map((d) => d.code).join(' + ')} (${isLockedNo ? 'Nomor Sertifikat Terkunci' : 'Kode Nomor: ABR-ROT'})`;
+    descEl.textContent = combineDeptDescriptions(matchedDepts);
+
+    const allComps = [];
+    matchedDepts.forEach((d) => {
+      String(d.competencies || '')
+        .split(/\r?\n/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .forEach((item) => {
+          if (!allComps.includes(item)) allComps.push(item);
+        });
+    });
+
+    compContainer.innerHTML = allComps
+      .map(
+        (comp) => `
+        <label class="cert-comp-chip">
+          <input type="checkbox" class="cert-comp-checkbox" value="${escapeHtml(comp)}">
+          <span>${escapeHtml(comp)}</span>
+        </label>
+      `
+      )
+      .join('');
   }
 
   function renderDivisionRows(items = [{ name: '', duration: '' }]) {
     const container = document.getElementById('cert-divisions-list');
     if (!container) return;
     const list = items.length ? items.slice(0, CERT_MAX_DIVISIONS) : [{ name: '', duration: '' }];
-    container.innerHTML = list.map((item, idx) => `
+    const activeDepts = (state.certDepartments || []).filter((d) => d.is_active !== false);
+
+    container.innerHTML = list
+      .map((item, idx) => {
+        const curName = String(item.name || '').trim();
+        const curLower = curName.toLowerCase();
+        const matched = activeDepts.find(
+          (d) =>
+            d.name.toLowerCase() === curLower ||
+            d.name.toLowerCase() === curLower.replace(/\s+department$/i, '').trim() ||
+            d.code.toLowerCase() === curLower
+        );
+        const optionsHtml = [
+          `<option value="">-- Pilih Departemen (${idx === 0 ? 'Utama' : `Rotasi ke-${idx + 1}`}) --</option>`,
+          ...activeDepts.map((d) => {
+            const selected = matched && matched.code === d.code ? ' selected' : '';
+            return `<option value="${escapeHtml(d.name)}"${selected}>${escapeHtml(d.code)} &mdash; ${escapeHtml(d.name)}</option>`;
+          }),
+        ];
+        if (curName && !matched) {
+          optionsHtml.push(
+            `<option value="${escapeHtml(curName)}" selected>${escapeHtml(curName)} (Kustom)</option>`
+          );
+        }
+        return `
       <div class="cert-division-row" data-div-index="${idx}">
-        <input type="text" class="cert-field-control cert-div-name" list="cert-dept-options"
-          value="${escapeHtml(item.name)}"
-          aria-label="Nama divisi ke-${idx + 1}"
-          placeholder="${idx === 0 ? 'Divisi (mis. Housekeeping, Front Office)' : 'Divisi berikutnya (mis. Restaurant Waiter)'}">
+        <select class="cert-field-control cert-div-name" aria-label="Nama divisi ke-${idx + 1}">
+          ${optionsHtml.join('')}
+        </select>
         <input type="text" class="cert-field-control cert-div-duration"
           value="${escapeHtml(item.duration)}"
           aria-label="Durasi divisi ke-${idx + 1}"
-          placeholder="Durasi (opsional, mis. 3 months)">
+          placeholder="mis. 3 months">
         <button type="button" class="btn btn-secondary btn-sm cert-division-remove"
           data-remove-div="${idx}"
           aria-label="${list.length > 1 ? `Hapus divisi ke-${idx + 1}` : 'Kosongkan divisi'}">${list.length > 1 ? 'Hapus' : 'Bersihkan'}</button>
       </div>
-    `).join('');
+    `;
+      })
+      .join('');
 
     const addBtn = document.getElementById('btn-cert-add-division');
     if (addBtn) addBtn.disabled = list.length >= CERT_MAX_DIVISIONS;
+    renderDeptCriteriaPanel();
+    updateDivisionDurationBalance();
   }
 
   function syncAchievementPresetSelect() {
@@ -3372,8 +3788,12 @@
     const select = document.getElementById('cert-achievement-preset');
     if (!input || !select) return;
     const val = input.value.trim();
-    const matched = Array.from(select.options).some((opt) => opt.value === val);
-    select.value = matched ? val : '';
+    if (!val) {
+      select.value = '';
+      return;
+    }
+    const matched = Array.from(select.options).some((opt) => opt.value && opt.value !== '__custom__' && opt.value === val);
+    select.value = matched ? val : '__custom__';
   }
 
   function formatDivisionsDisplay(raw) {
@@ -3383,22 +3803,31 @@
     return items.map((it) => (it.duration ? `${it.name} (${it.duration})` : it.name)).join(' & ');
   }
 
-  function collectCertFormPayload(overrideStatus = null) {
+  function collectCertFormPayload(overrideStatus = null, { forAutoCreate = false } = {}) {
     const val = (id) => document.getElementById(id)?.value?.trim() || '';
     const optVal = (id) => {
       const v = val(id);
       return v.length > 0 ? v : null;
     };
     const def = state.certSettings || {};
+    const progCode = optVal('cert-program-type');
+    const progRow = progCode
+      ? (state.certProgramTypes || []).find((p) => p.code.toUpperCase() === progCode.toUpperCase())
+      : null;
+
     return {
-      certificate_no: optVal('cert-no'),
+      certificate_no: forAutoCreate ? null : optVal('cert-no'),
       recipient_name: val('cert-recipient'),
       duration_text: val('cert-duration'),
-      program_name: optVal('cert-program') || def.program_name || 'hospitality training program',
+      program_name: optVal('cert-program') || progRow?.name || def.program_name || 'hospitality training program',
       start_date: val('cert-start'),
       end_date: val('cert-end'),
       issued_date: val('cert-issued'),
+      issued_city: optVal('cert-issued-city') || def.issued_city || DEFAULT_CERT_ISSUED_CITY,
+      body_template: optVal('cert-body-template') || def.body_template || DEFAULT_CERT_BODY_TEMPLATE,
       department: serializeDivisionRows(),
+      department_code: getSelectedDepartmentCode(),
+      program_type_code: progCode,
       institution: optVal('cert-institution'),
       achievement_text: optVal('cert-achievement'),
       notes: optVal('cert-notes'),
@@ -3475,6 +3904,14 @@
       showCertStatus('Mohon lengkapi atau perbaiki kolom sertifikat yang ditandai.', 'error');
       return false;
     }
+    const balance = updateDivisionDurationBalance();
+    if (balance.exceeded) {
+      const firstDivDur = Array.from(document.querySelectorAll('#cert-divisions-list .cert-div-duration'))
+        .find((input) => input.value.trim());
+      firstDivDur?.focus();
+      showCertStatus(balance.message, 'error');
+      return false;
+    }
     return true;
   }
 
@@ -3503,14 +3940,30 @@
     }
   }
 
+  function getIssuedYearAndMonth() {
+    const issuedVal = document.getElementById('cert-issued')?.value || '';
+    const m = /^(\d{4})-(\d{2})/.exec(issuedVal);
+    if (m) {
+      return {
+        year: parseInt(m[1], 10),
+        month: parseInt(m[2], 10),
+      };
+    }
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() + 1 };
+  }
+
   async function refreshNextCertNoIfAuto() {
-    if (state.certManualNo || state.certEditingId) return;
-    const issuedVal = document.getElementById('cert-issued')?.value;
-    const yearMatch = issuedVal && /^(\d{4})/.exec(issuedVal);
-    const year = yearMatch ? parseInt(yearMatch[1], 10) : new Date().getFullYear();
+    const noInput = document.getElementById('cert-no');
+    if (state.certManualNo || state.certEditingId || noInput?.readOnly) return;
+    const { year, month } = getIssuedYearAndMonth();
+    const departmentCode = getSelectedDepartmentCode();
     try {
-      const nextNo = await invoke('get_next_certificate_no', { year });
-      const noInput = document.getElementById('cert-no');
+      const nextNo = await invoke('get_next_certificate_no', {
+        year,
+        month,
+        departmentCode,
+      });
       if (noInput) noInput.value = nextNo;
     } catch (err) {
       console.warn('Gagal mengambil nomor sertifikat berikutnya:', err);
@@ -3520,32 +3973,51 @@
   function applyCertDefaultsToForm({ keepBatchFields = false } = {}) {
     const def = state.certSettings || {};
     const todayIso = getSystemLocalDateStr();
-    const startDefault = getMonthsAgoLocalDateStr(3);
+    const listProg = (state.certProgramTypes || []).filter((p) => p.is_active !== false);
+    const defaultProg = listProg[0] || null;
+    const defaultMonths = defaultProg?.default_duration_months || 3;
+    const startDefault = getMonthsAgoLocalDateStr(defaultMonths);
 
     state.certEditingId = null;
     state.certEditingStatus = 'active';
     state.certManualNo = false;
+    state.certStaffSavedLock = false;
+    setCertNoLocked(false);
 
     const editBanner = document.getElementById('cert-edit-banner');
     if (editBanner) editBanner.classList.add('hidden');
     const heading = document.getElementById('cert-form-heading');
     if (heading) heading.textContent = 'Buat Sertifikat Baru';
     const btnSave = document.getElementById('btn-cert-save');
-    if (btnSave) btnSave.textContent = 'Simpan Sertifikat';
+    if (btnSave) {
+      btnSave.textContent = 'Simpan Sertifikat';
+      btnSave.disabled = false;
+    }
     const btnSaveNext = document.getElementById('btn-cert-save-next');
-    if (btnSaveNext) btnSaveNext.classList.remove('hidden');
+    if (btnSaveNext) {
+      btnSaveNext.classList.remove('hidden');
+      btnSaveNext.disabled = false;
+    }
 
     if (keepBatchFields) {
       document.getElementById('cert-recipient').value = '';
       document.getElementById('cert-notes').value = '';
+      renderDeptCriteriaPanel();
+      updateDivisionDurationBalance();
     } else {
       state.certManualDuration = false;
+      state.certManualDates = false;
+      populateProgramTypeSelect(defaultProg?.code || '');
+      const progSelectEl = document.getElementById('cert-program-type');
+      const selectedProg = (state.certProgramTypes || []).find((p) => p.code === progSelectEl?.value);
       document.getElementById('cert-recipient').value = '';
       document.getElementById('cert-start').value = startDefault;
       document.getElementById('cert-end').value = todayIso;
       document.getElementById('cert-issued').value = todayIso;
+      document.getElementById('cert-issued-city').value = def.issued_city || DEFAULT_CERT_ISSUED_CITY;
       document.getElementById('cert-duration').value = suggestEnglishDuration(startDefault, todayIso);
-      document.getElementById('cert-program').value = def.program_name || 'hospitality training program';
+      document.getElementById('cert-program').value = selectedProg?.name || def.program_name || 'hospitality training program';
+      document.getElementById('cert-body-template').value = '';
       renderDivisionRows([{ name: '', duration: '' }]);
       document.getElementById('cert-achievement').value = '';
       syncAchievementPresetSelect();
@@ -3559,10 +4031,26 @@
   }
 
   function populateCertFormFromRow(row, asEdit = false, { skipPreview = false } = {}) {
+    const def = state.certSettings || {};
     state.certEditingId = asEdit ? row.id : null;
     state.certEditingStatus = row.status || 'active';
     state.certManualNo = true;
     state.certManualDuration = true;
+    state.certManualDates = true;
+    state.certStaffSavedLock = false;
+    setCertNoLocked(Boolean(asEdit));
+    const btnSaveReset = document.getElementById('btn-cert-save');
+    const btnNextReset = document.getElementById('btn-cert-save-next');
+    if (btnSaveReset) btnSaveReset.disabled = false;
+    if (btnNextReset) btnNextReset.disabled = false;
+
+    const matchedProg =
+      row.program_type_code ||
+      (state.certProgramTypes || []).find(
+        (p) => p.name.toLowerCase() === String(row.program_name || '').trim().toLowerCase()
+      )?.code ||
+      '__custom__';
+    populateProgramTypeSelect(matchedProg);
 
     document.getElementById('cert-no').value = row.certificate_no || '';
     document.getElementById('cert-recipient').value = row.recipient_name || '';
@@ -3570,7 +4058,12 @@
     document.getElementById('cert-end').value = row.end_date || '';
     document.getElementById('cert-duration').value = row.duration_text || '';
     document.getElementById('cert-issued').value = row.issued_date || '';
+    document.getElementById('cert-issued-city').value = row.issued_city || def.issued_city || DEFAULT_CERT_ISSUED_CITY;
     document.getElementById('cert-program').value = row.program_name || 'hospitality training program';
+    document.getElementById('cert-body-template').value =
+      row.body_template && row.body_template !== (def.body_template || DEFAULT_CERT_BODY_TEMPLATE)
+        ? row.body_template
+        : '';
     renderDivisionRows(parseDepartmentString(row.department));
     document.getElementById('cert-achievement').value = row.achievement_text || '';
     syncAchievementPresetSelect();
@@ -3582,7 +4075,7 @@
     clearCertFormAriaErrors();
 
     const details = document.getElementById('cert-optional-details');
-    if (details && (row.institution || row.notes)) {
+    if (details && (row.institution || row.notes || document.getElementById('cert-body-template')?.value)) {
       details.open = true;
     }
 
@@ -3611,7 +4104,204 @@
     }
   }
 
+  function getCertDraftStorageKey() {
+    return `anda_erp_cert_draft_${state.currentUser?.username || 'default'}`;
+  }
+
+  function serializeCertFormSnapshot() {
+    const raw = (id) => document.getElementById(id)?.value?.trim() || '';
+    return JSON.stringify({
+      certificate_no: raw('cert-no'),
+      recipient_name: raw('cert-recipient'),
+      start_date: raw('cert-start'),
+      end_date: raw('cert-end'),
+      program_type_code: raw('cert-program-type'),
+      duration_text: raw('cert-duration'),
+      issued_date: raw('cert-issued'),
+      issued_city: raw('cert-issued-city'),
+      department: serializeDivisionRows(),
+      achievement_text: raw('cert-achievement'),
+      paper_size: getSelectedCertPaperSize(),
+      program_name: raw('cert-program'),
+      body_template: raw('cert-body-template'),
+      institution: raw('cert-institution'),
+      signer_name: raw('cert-signer'),
+      signer_title: raw('cert-signer-title'),
+      notes: raw('cert-notes'),
+    });
+  }
+
+  function isCertFormDirty() {
+    return Boolean(
+      state.certInitialized &&
+        state.certCleanSnapshot &&
+        serializeCertFormSnapshot() !== state.certCleanSnapshot
+    );
+  }
+
+  function syncCertDirtyUI() {
+    const badge = document.getElementById('cert-dirty-badge');
+    if (badge) badge.classList.toggle('hidden', !isCertFormDirty());
+  }
+
+  function markCertFormClean() {
+    state.certCleanSnapshot = serializeCertFormSnapshot();
+    syncCertDirtyUI();
+  }
+
+  function clearCertDraftFromStorage() {
+    try {
+      localStorage.removeItem(getCertDraftStorageKey());
+    } catch (err) {
+      console.warn('Gagal menghapus draf sertifikat:', err);
+    }
+  }
+
+  function saveCertDraftToStorage() {
+    if (!state.certInitialized) return;
+    if (!isCertFormDirty()) {
+      clearCertDraftFromStorage();
+      return;
+    }
+    try {
+      const draft = {
+        version: 1,
+        savedAt: new Date().toISOString(),
+        editingId: state.certEditingId,
+        editingStatus: state.certEditingStatus,
+        editingLabel: document.getElementById('cert-edit-label')?.textContent || '',
+        manualNo: state.certManualNo,
+        manualDuration: state.certManualDuration,
+        fields: {
+          ...collectCertFormPayload(),
+          body_template: document.getElementById('cert-body-template')?.value?.trim() || '',
+        },
+      };
+      localStorage.setItem(getCertDraftStorageKey(), JSON.stringify(draft));
+    } catch (err) {
+      console.warn('Gagal menyimpan draf sertifikat:', err);
+    }
+  }
+
+  function loadCertDraftFromStorage() {
+    try {
+      const raw = localStorage.getItem(getCertDraftStorageKey());
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (parsed?.version === 1 && parsed?.fields && typeof parsed.fields === 'object') {
+        return parsed;
+      }
+    } catch (err) {
+      console.warn('Gagal membaca draf sertifikat tersimpan:', err);
+    }
+    return null;
+  }
+
+  function applyCertDraftToForm(draft) {
+    const f = draft?.fields || {};
+    const isEditDraft = Boolean(draft.editingId && isAdminUser());
+    state.certEditingId = isEditDraft ? draft.editingId : null;
+    state.certStaffSavedLock = false;
+    setCertNoLocked(isEditDraft);
+    if (draft.manualNo || isEditDraft) {
+      document.getElementById('cert-no').value = f.certificate_no || '';
+      state.certManualNo = Boolean(draft.manualNo || isEditDraft);
+    }
+    const btnPrimary = document.getElementById('btn-cert-save');
+    const btnNext = document.getElementById('btn-cert-save-next');
+    if (btnPrimary) btnPrimary.disabled = false;
+    if (btnNext) btnNext.disabled = false;
+    state.certManualDuration = Boolean(draft.manualDuration);
+    state.certManualDates = true;
+
+    populateProgramTypeSelect(f.program_type_code || '__custom__');
+    document.getElementById('cert-recipient').value = f.recipient_name || '';
+    document.getElementById('cert-start').value = f.start_date || '';
+    document.getElementById('cert-end').value = f.end_date || '';
+    document.getElementById('cert-duration').value = f.duration_text ?? '';
+    document.getElementById('cert-issued').value = f.issued_date || '';
+    document.getElementById('cert-issued-city').value = f.issued_city ?? (state.certSettings?.issued_city || DEFAULT_CERT_ISSUED_CITY);
+    document.getElementById('cert-program').value = f.program_name ?? '';
+    const defTpl = state.certSettings?.body_template || DEFAULT_CERT_BODY_TEMPLATE;
+    document.getElementById('cert-body-template').value =
+      f.body_template && f.body_template !== defTpl ? f.body_template : '';
+    renderDivisionRows(parseDepartmentString(f.department));
+    document.getElementById('cert-achievement').value = f.achievement_text || '';
+    syncAchievementPresetSelect();
+    document.getElementById('cert-institution').value = f.institution || '';
+    document.getElementById('cert-signer').value = f.signer_name ?? '';
+    document.getElementById('cert-signer-title').value = f.signer_title ?? '';
+    document.getElementById('cert-notes').value = f.notes || '';
+    setSelectedCertPaperSize(f.paper_size || 'F4');
+
+    const details = document.getElementById('cert-optional-details');
+    if (details && (f.institution || f.notes || document.getElementById('cert-body-template')?.value)) {
+      details.open = true;
+    }
+
+    const editBanner = document.getElementById('cert-edit-banner');
+    const editLabel = document.getElementById('cert-edit-label');
+    const heading = document.getElementById('cert-form-heading');
+    const btnSave = document.getElementById('btn-cert-save');
+    const btnSaveNext = document.getElementById('btn-cert-save-next');
+
+    if (isEditDraft) {
+      state.certEditingStatus = draft.editingStatus || 'active';
+      if (editBanner) editBanner.classList.remove('hidden');
+      if (editLabel) {
+        editLabel.textContent = draft.editingLabel || `Mode Edit: ${f.certificate_no || ''} (${f.recipient_name || ''})`;
+      }
+      if (heading) heading.textContent = 'Edit Data Sertifikat';
+      if (btnSave) btnSave.textContent = 'Simpan Perubahan';
+      if (btnSaveNext) btnSaveNext.classList.add('hidden');
+      state.certCleanSnapshot = '__restored_edit_draft__';
+    } else {
+      state.certEditingId = null;
+      state.certEditingStatus = 'active';
+      if (editBanner) editBanner.classList.add('hidden');
+      if (heading) heading.textContent = 'Buat Sertifikat Baru';
+      if (btnSave) btnSave.textContent = 'Simpan Sertifikat';
+      if (btnSaveNext) btnSaveNext.classList.remove('hidden');
+    }
+
+    clearCertFormAriaErrors();
+    syncCertDirtyUI();
+  }
+
+  function enterArchivePreviewMode(row) {
+    state.certPreviewRow = row;
+    const banner = document.getElementById('cert-archive-preview-banner');
+    const label = document.getElementById('cert-archive-preview-label');
+    if (label) {
+      label.textContent = `Pratinjau Arsip: ${row.certificate_no} (${row.recipient_name}) - formulir di kiri tetap aman.`;
+    }
+    if (banner) banner.classList.remove('hidden');
+    refreshCertPreview(rowToCertificateRenderPayload(row));
+    showCertStatus(
+      `Menampilkan pratinjau arsip ${row.certificate_no} (${row.recipient_name}). Formulir yang sedang Anda isi tetap aman.`,
+      'info'
+    );
+  }
+
+  function exitArchivePreviewMode({ skipPreview = false } = {}) {
+    state.certPreviewRow = null;
+    const banner = document.getElementById('cert-archive-preview-banner');
+    if (banner) banner.classList.add('hidden');
+    if (!skipPreview) {
+      refreshCertPreview();
+    }
+  }
+
+  function handleCertFormMutated() {
+    if (state.certPreviewRow) {
+      exitArchivePreviewMode({ skipPreview: true });
+    }
+    syncCertDirtyUI();
+    saveCertDraftToStorage();
+  }
+
   async function submitCertificateForm({ andNext = false } = {}) {
+    if (state.certStaffSavedLock) return;
     if (!validateCertificateForm()) return;
 
     const btnPrimary = document.getElementById('btn-cert-save');
@@ -3620,26 +4310,41 @@
     if (btnNext) btnNext.disabled = true;
 
     try {
-      const payload = collectCertFormPayload();
       let saved;
       if (state.certEditingId) {
+        const payload = collectCertFormPayload();
         saved = await invoke('update_certificate', { id: state.certEditingId, payload });
-        state.certEditingId = null;
         state.certEditingStatus = saved.status || 'active';
-        populateCertFormFromRow(saved, false, { skipPreview: true });
+        exitArchivePreviewMode({ skipPreview: true });
+        clearCertDraftFromStorage();
+        populateCertFormFromRow(saved, true, { skipPreview: true });
+        markCertFormClean();
         showCertStatus(`Perubahan sertifikat ${saved.certificate_no} (${saved.recipient_name}) berhasil disimpan.`, 'success');
       } else {
+        const payload = collectCertFormPayload(null, { forAutoCreate: !state.certManualNo });
         saved = await invoke('create_certificate', { payload });
+        exitArchivePreviewMode({ skipPreview: true });
+        clearCertDraftFromStorage();
         if (andNext) {
           applyCertDefaultsToForm({ keepBatchFields: true });
           await refreshNextCertNoIfAuto();
+          markCertFormClean();
           showCertStatus(`Sertifikat ${saved.certificate_no} (${saved.recipient_name}) tersimpan. Silakan isi peserta berikutnya.`, 'success');
           document.getElementById('cert-recipient')?.focus();
         } else if (isAdminUser()) {
           populateCertFormFromRow(saved, true, { skipPreview: true });
+          markCertFormClean();
           showCertStatus(`Sertifikat ${saved.certificate_no} (${saved.recipient_name}) tersimpan. Anda dapat langsung mengekspor/mencetak atau menyuntingnya.`, 'success');
         } else {
+          document.getElementById('cert-no').value = saved.certificate_no;
+          document.getElementById('cert-recipient').value = saved.recipient_name;
+          state.certManualNo = true;
+          state.certStaffSavedLock = true;
           state.certEditingStatus = saved.status || 'active';
+          setCertNoLocked(true);
+          renderDeptCriteriaPanel();
+          updateDivisionDurationBalance();
+          markCertFormClean();
           showCertStatus(`Sertifikat ${saved.certificate_no} (${saved.recipient_name}) tersimpan. Silakan ekspor/cetak atau klik Baru / Reset untuk peserta berikutnya.`, 'success');
         }
       }
@@ -3649,8 +4354,8 @@
     } catch (err) {
       showCertStatus(String(err), 'error');
     } finally {
-      if (btnPrimary) btnPrimary.disabled = false;
-      if (btnNext) btnNext.disabled = false;
+      if (btnPrimary) btnPrimary.disabled = state.certStaffSavedLock;
+      if (btnNext) btnNext.disabled = state.certStaffSavedLock;
     }
   }
 
@@ -3677,6 +4382,12 @@
     }
   }
 
+  function formatCertUiDate(raw) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(raw || '').trim());
+    if (!m) return raw || '-';
+    return `${m[3]}/${m[2]}/${m[1]}`;
+  }
+
   function renderCertificateHistoryRows() {
     const tbody = document.getElementById('cert-history-body');
     if (!tbody) return;
@@ -3699,7 +4410,7 @@
       const deptLabel = row.department ? formatDivisionsDisplay(row.department) : '';
       const deptInst = [deptLabel, row.institution].filter(Boolean).join(' / ') || '-';
       const achSubtitle = row.achievement_text
-        ? `<div class="text-muted" style="font-size:11px;">${escapeHtml(row.achievement_text)}</div>`
+        ? `<div class="cert-ach-preview" tabindex="0" title="${escapeHtml(row.achievement_text)}"><span class="cert-ach-ellipsis">${escapeHtml(row.achievement_text)}</span><span class="cert-ach-tooltip" role="tooltip">${escapeHtml(row.achievement_text)}</span></div>`
         : '';
       const adminButtons = adminMode
         ? `
@@ -3711,10 +4422,10 @@
 
       return `
         <tr>
-          <td data-label="Nomor" class="font-mono"><strong>${escapeHtml(row.certificate_no)}</strong></td>
-          <td data-label="Nama Penerima"><strong>${escapeHtml(row.recipient_name)}</strong>${achSubtitle}</td>
-          <td data-label="Durasi &amp; Periode">${escapeHtml(row.duration_text)}<div class="text-muted" style="font-size:11px;">${escapeHtml(row.start_date)} s/d ${escapeHtml(row.end_date)}</div></td>
-          <td data-label="Tgl Terbit" class="font-mono">${escapeHtml(row.issued_date)}</td>
+          <td data-label="Nomor" class="font-mono cert-cell-nowrap"><strong>${escapeHtml(row.certificate_no)}</strong></td>
+          <td data-label="Nama Penerima" class="cert-col-recipient"><strong>${escapeHtml(row.recipient_name)}</strong>${achSubtitle}</td>
+          <td data-label="Durasi &amp; Periode">${escapeHtml(row.duration_text)}<div class="text-muted cert-cell-nowrap" style="font-size:11px;">${escapeHtml(formatCertUiDate(row.start_date))} s/d ${escapeHtml(formatCertUiDate(row.end_date))}</div></td>
+          <td data-label="Tgl Terbit" class="font-mono cert-cell-nowrap">${escapeHtml(formatCertUiDate(row.issued_date))}</td>
           <td data-label="Departemen / Kampus">${escapeHtml(deptInst)}</td>
           <td data-label="Kertas">${escapeHtml(row.paper_size)}</td>
           <td data-label="Status">${statusPill}</td>
@@ -3787,6 +4498,8 @@
       start_date: row.start_date,
       end_date: row.end_date,
       issued_date: row.issued_date,
+      issued_city: row.issued_city,
+      body_template: row.body_template,
       department: row.department,
       achievement_text: row.achievement_text,
       signer_name: row.signer_name,
@@ -3804,7 +4517,16 @@
     const cmd = format === 'png' ? 'export_certificate_png' : 'export_certificate_pdf';
     try {
       const msg = await invoke(cmd, { payload });
-      if (msg && !String(msg).toLowerCase().includes('dibatalkan')) {
+      const unsavedDraft = !row && isCertFormDirty();
+      const cancelled = !msg || String(msg).toLowerCase().includes('dibatalkan');
+      if (unsavedDraft) {
+        showCertStatus(
+          cancelled
+            ? 'Ekspor dibatalkan. Pengingat: sertifikat pada formulir belum disimpan ke database.'
+            : `${msg} (Pengingat: sertifikat pada formulir belum disimpan ke database.)`,
+          'warning'
+        );
+      } else if (msg && !cancelled) {
         showCertStatus(msg, 'success');
       } else if (msg) {
         showCertStatus(msg, 'info');
@@ -3850,18 +4572,38 @@
     state.certEditingStatus = 'active';
     state.certManualNo = false;
     state.certManualDuration = false;
+    state.certManualDates = false;
+    state.certStaffSavedLock = false;
     state.certSettings = null;
+    state.certDepartments = [];
+    state.certProgramTypes = [];
     state.certRows = [];
     state.certPage = 1;
     state.certTotalPages = 1;
     state.certYear = 'all';
     state.certStatus = 'all';
     state.certSearch = '';
+    state.certCleanSnapshot = '';
+    state.certPreviewRow = null;
 
     cleanupCertificatePrintMode();
 
+    const dirtyBadge = document.getElementById('cert-dirty-badge');
+    if (dirtyBadge) dirtyBadge.classList.add('hidden');
+    const previewBanner = document.getElementById('cert-archive-preview-banner');
+    if (previewBanner) previewBanner.classList.add('hidden');
+    const criteriaPanel = document.getElementById('cert-dept-criteria-panel');
+    if (criteriaPanel) criteriaPanel.classList.add('hidden');
+    const balanceEl = document.getElementById('cert-divisions-balance');
+    if (balanceEl) {
+      balanceEl.className = 'cert-field-hint hidden';
+      balanceEl.textContent = '';
+    }
+
     const settingsDialog = document.getElementById('dialog-cert-settings');
     if (settingsDialog?.open) settingsDialog.close();
+    const catalogDialog = document.getElementById('dialog-cert-catalog');
+    if (catalogDialog?.open) catalogDialog.close();
 
     if (document.getElementById('form-certificate')) {
       applyCertDefaultsToForm({ keepBatchFields: false });
@@ -3941,6 +4683,13 @@
         window.print();
       }
 
+      if (!row && isCertFormDirty()) {
+        showCertStatus(
+          'Dialog cetak dibuka. Pengingat: sertifikat pada formulir belum disimpan ke database - klik Simpan Sertifikat setelah selesai.',
+          'warning'
+        );
+      }
+
       if (certPrintFallbackCleanup) {
         focusTimer = setTimeout(() => {
           if (document.body.classList.contains('printing-certificate')) {
@@ -3960,6 +4709,8 @@
     document.getElementById('cfg-cert-title').value = cfg.signer_title || 'General Manager';
     document.getElementById('cfg-cert-program').value = cfg.program_name || 'hospitality training program';
     document.getElementById('cfg-cert-paper').value = cfg.paper_size === 'A4' ? 'A4' : 'F4';
+    document.getElementById('cfg-cert-city').value = cfg.issued_city || DEFAULT_CERT_ISSUED_CITY;
+    document.getElementById('cfg-cert-template').value = cfg.body_template || DEFAULT_CERT_BODY_TEMPLATE;
     document.getElementById('cfg-cert-show-sig').checked = Boolean(cfg.show_signature);
 
     const logoPreview = document.getElementById('cfg-cert-logo-preview');
@@ -3982,18 +4733,350 @@
     }
   }
 
+  function shiftDateByMonthsIso(endIso, months) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(endIso || '').trim());
+    if (!m) return getMonthsAgoLocalDateStr(months);
+    const y = parseInt(m[1], 10);
+    const mon = parseInt(m[2], 10) - 1;
+    const day = parseInt(m[3], 10);
+    const delta = Math.max(1, Number(months) || 3);
+    const firstTarget = new Date(y, mon - delta, 1);
+    const maxDay = new Date(firstTarget.getFullYear(), firstTarget.getMonth() + 1, 0).getDate();
+    const clamped = Math.min(day, maxDay);
+    const yyyy = firstTarget.getFullYear();
+    const mm = String(firstTarget.getMonth() + 1).padStart(2, '0');
+    const dd = String(clamped).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  async function reloadCertCatalogData() {
+    const [departments, programTypes] = await Promise.all([
+      invoke('get_departments'),
+      invoke('get_program_types'),
+    ]);
+    state.certDepartments = departments || [];
+    state.certProgramTypes = programTypes || [];
+  }
+
   async function loadCertificatesModuleView() {
     if (!state.certInitialized) {
       try {
-        state.certSettings = await invoke('get_certificate_settings');
+        const [cfg, departments, programTypes] = await Promise.all([
+          invoke('get_certificate_settings'),
+          invoke('get_departments'),
+          invoke('get_program_types'),
+        ]);
+        state.certSettings = cfg;
+        state.certDepartments = departments || [];
+        state.certProgramTypes = programTypes || [];
       } catch (err) {
-        console.warn('Gagal memuat pengaturan sertifikat:', err);
+        console.warn('Gagal memuat pengaturan/katalog sertifikat:', err);
       }
       applyCertDefaultsToForm({ keepBatchFields: false });
       await refreshNextCertNoIfAuto();
       state.certInitialized = true;
+      markCertFormClean();
+
+      const restoredDraft = loadCertDraftFromStorage();
+      if (restoredDraft) {
+        applyCertDraftToForm(restoredDraft);
+        if (!state.certManualNo && !state.certEditingId) {
+          await refreshNextCertNoIfAuto();
+        }
+        showCertStatus(
+          'Draf sertifikat yang belum disimpan berhasil dipulihkan. Klik Simpan Sertifikat untuk menyimpan ke database, atau Baru / Reset untuk membuangnya.',
+          'warning'
+        );
+      }
     }
-    await Promise.all([refreshCertificateYears(), loadCertificatesHistory(), refreshCertPreview()]);
+    await Promise.all([
+      refreshCertificateYears(),
+      loadCertificatesHistory(),
+      refreshCertPreview(state.certPreviewRow ? rowToCertificateRenderPayload(state.certPreviewRow) : null),
+    ]);
+  }
+
+  function initCertCatalogDialog() {
+    const dialog = document.getElementById('dialog-cert-catalog');
+    const btnOpen = document.getElementById('btn-cert-catalog');
+    if (!dialog || !btnOpen) return;
+
+    const tabDept = document.getElementById('tab-catalog-dept');
+    const tabProg = document.getElementById('tab-catalog-prog');
+    const panelDept = document.getElementById('panel-catalog-dept');
+    const panelProg = document.getElementById('panel-catalog-prog');
+    const statusEl = document.getElementById('cert-catalog-status');
+    const confirmBox = document.getElementById('cert-catalog-confirm');
+    const confirmTextEl = document.getElementById('cert-catalog-confirm-text');
+    let pendingDelete = null;
+
+    const showCatalogStatus = (msg = '', type = 'info') => {
+      if (!statusEl) return;
+      if (!msg) {
+        statusEl.className = 'cert-status-line info hidden';
+        statusEl.textContent = '';
+        return;
+      }
+      statusEl.className = `cert-status-line ${type}`;
+      statusEl.textContent = msg;
+    };
+
+    const clearPendingDelete = () => {
+      pendingDelete = null;
+      if (confirmBox) confirmBox.classList.add('hidden');
+      if (confirmTextEl) confirmTextEl.textContent = '';
+    };
+
+    const askInlineDelete = (kind, id, label) => {
+      pendingDelete = { kind, id, label };
+      if (confirmTextEl) {
+        confirmTextEl.textContent = `Hapus permanen "${label}" dari database?`;
+      }
+      if (confirmBox) confirmBox.classList.remove('hidden');
+    };
+
+    const switchTab = (tabName) => {
+      const isDept = tabName === 'dept';
+      clearPendingDelete();
+      tabDept?.classList.toggle('is-active', isDept);
+      tabProg?.classList.toggle('is-active', !isDept);
+      tabDept?.setAttribute('aria-selected', isDept ? 'true' : 'false');
+      tabProg?.setAttribute('aria-selected', isDept ? 'false' : 'true');
+      panelDept?.classList.toggle('hidden', !isDept);
+      panelProg?.classList.toggle('hidden', isDept);
+    };
+
+    const resetDeptForm = () => {
+      document.getElementById('cat-dept-id').value = '';
+      document.getElementById('cat-dept-code').value = '';
+      document.getElementById('cat-dept-name').value = '';
+      document.getElementById('cat-dept-desc').value = '';
+      document.getElementById('cat-dept-comp').value = '';
+    };
+
+    const resetProgForm = () => {
+      document.getElementById('cat-prog-id').value = '';
+      document.getElementById('cat-prog-code').value = '';
+      document.getElementById('cat-prog-name').value = '';
+      document.getElementById('cat-prog-months').value = '3';
+      document.getElementById('cat-prog-desc').value = '';
+    };
+
+    const renderCatalogLists = () => {
+      const deptList = document.getElementById('catalog-dept-list');
+      if (deptList) {
+        deptList.innerHTML = (state.certDepartments || [])
+          .map(
+            (d) => `
+          <div class="cert-catalog-item">
+            <div class="cert-catalog-item-main">
+              <div class="cert-catalog-item-title">${escapeHtml(d.code)} &mdash; ${escapeHtml(d.name)}</div>
+              <div class="cert-catalog-item-sub">${escapeHtml(d.program_description || '-')}</div>
+            </div>
+            <div class="cert-catalog-item-actions">
+              <button type="button" class="btn btn-secondary btn-sm" data-cat-action="edit-dept" data-cat-id="${d.id}">Edit</button>
+              <button type="button" class="btn btn-danger btn-sm" data-cat-action="del-dept" data-cat-id="${d.id}">Hapus</button>
+            </div>
+          </div>
+        `
+          )
+          .join('') || '<div class="text-muted text-center" style="padding:12px;">Belum ada departemen.</div>';
+      }
+
+      const progList = document.getElementById('catalog-prog-list');
+      if (progList) {
+        progList.innerHTML = (state.certProgramTypes || [])
+          .map(
+            (p) => `
+          <div class="cert-catalog-item">
+            <div class="cert-catalog-item-main">
+              <div class="cert-catalog-item-title">${escapeHtml(p.code)} &mdash; ${escapeHtml(p.name)} (${p.default_duration_months} bln)</div>
+              <div class="cert-catalog-item-sub">${escapeHtml(p.description || '-')}</div>
+            </div>
+            <div class="cert-catalog-item-actions">
+              <button type="button" class="btn btn-secondary btn-sm" data-cat-action="edit-prog" data-cat-id="${p.id}">Edit</button>
+              <button type="button" class="btn btn-danger btn-sm" data-cat-action="del-prog" data-cat-id="${p.id}">Hapus</button>
+            </div>
+          </div>
+        `
+          )
+          .join('') || '<div class="text-muted text-center" style="padding:12px;">Belum ada jenis program.</div>';
+      }
+    };
+
+    const syncMainFormFromCatalog = async () => {
+      const wasDirty = isCertFormDirty();
+      const currentRows = readDivisionRowsFromDom();
+      renderDivisionRows(currentRows);
+      const curProgCode = document.getElementById('cert-program-type')?.value || '';
+      populateProgramTypeSelect(curProgCode || '__custom__');
+      await refreshNextCertNoIfAuto();
+      if (!wasDirty) markCertFormClean();
+      else saveCertDraftToStorage();
+      scheduleCertPreview(true);
+    };
+
+    btnOpen.addEventListener('click', async () => {
+      try {
+        await reloadCertCatalogData();
+        renderCatalogLists();
+        resetDeptForm();
+        resetProgForm();
+        clearPendingDelete();
+        showCatalogStatus('');
+        switchTab('dept');
+        dialog.showModal();
+      } catch (err) {
+        showCertStatus(`Gagal membuka katalog departemen: ${err}`, 'error');
+      }
+    });
+
+    document.getElementById('btn-close-cert-catalog')?.addEventListener('click', () => {
+      clearPendingDelete();
+      dialog.close();
+    });
+    tabDept?.addEventListener('click', () => switchTab('dept'));
+    tabProg?.addEventListener('click', () => switchTab('prog'));
+    document.getElementById('btn-cat-dept-new')?.addEventListener('click', () => {
+      clearPendingDelete();
+      resetDeptForm();
+      document.getElementById('cat-dept-code')?.focus();
+    });
+    document.getElementById('btn-cat-prog-new')?.addEventListener('click', () => {
+      clearPendingDelete();
+      resetProgForm();
+      document.getElementById('cat-prog-code')?.focus();
+    });
+    document.getElementById('btn-cat-confirm-no')?.addEventListener('click', clearPendingDelete);
+
+    document.getElementById('btn-cat-confirm-yes')?.addEventListener('click', async () => {
+      if (!pendingDelete) return;
+      const { kind, id, label } = pendingDelete;
+      clearPendingDelete();
+      try {
+        if (kind === 'dept') {
+          await invoke('delete_department', { id });
+          await reloadCertCatalogData();
+          renderCatalogLists();
+          resetDeptForm();
+          await syncMainFormFromCatalog();
+          showCatalogStatus(`Departemen "${label}" dihapus.`, 'success');
+        } else {
+          await invoke('delete_program_type', { id });
+          await reloadCertCatalogData();
+          renderCatalogLists();
+          resetProgForm();
+          await syncMainFormFromCatalog();
+          showCatalogStatus(`Jenis program "${label}" dihapus.`, 'success');
+        }
+      } catch (err) {
+        showCatalogStatus(String(err), 'error');
+      }
+    });
+
+    dialog.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-cat-action]');
+      if (!btn) return;
+      const action = btn.dataset.catAction;
+      const id = Number(btn.dataset.catId);
+
+      if (action === 'edit-dept') {
+        clearPendingDelete();
+        const d = (state.certDepartments || []).find((x) => x.id === id);
+        if (!d) return;
+        document.getElementById('cat-dept-id').value = String(d.id);
+        document.getElementById('cat-dept-code').value = d.code || '';
+        document.getElementById('cat-dept-name').value = d.name || '';
+        document.getElementById('cat-dept-desc').value = d.program_description || '';
+        document.getElementById('cat-dept-comp').value = d.competencies || '';
+        document.getElementById('cat-dept-name')?.focus();
+      } else if (action === 'del-dept') {
+        const d = (state.certDepartments || []).find((x) => x.id === id);
+        if (!d) return;
+        askInlineDelete('dept', id, `${d.code} - ${d.name}`);
+      } else if (action === 'edit-prog') {
+        clearPendingDelete();
+        const p = (state.certProgramTypes || []).find((x) => x.id === id);
+        if (!p) return;
+        document.getElementById('cat-prog-id').value = String(p.id);
+        document.getElementById('cat-prog-code').value = p.code || '';
+        document.getElementById('cat-prog-name').value = p.name || '';
+        document.getElementById('cat-prog-months').value = String(p.default_duration_months || 3);
+        document.getElementById('cat-prog-desc').value = p.description || '';
+        document.getElementById('cat-prog-name')?.focus();
+      } else if (action === 'del-prog') {
+        const p = (state.certProgramTypes || []).find((x) => x.id === id);
+        if (!p) return;
+        askInlineDelete('prog', id, `${p.code} - ${p.name}`);
+      }
+    });
+
+    document.getElementById('form-catalog-dept')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearPendingDelete();
+      const idRaw = document.getElementById('cat-dept-id').value.trim();
+      const codeEl = document.getElementById('cat-dept-code');
+      const nameEl = document.getElementById('cat-dept-name');
+      const code = codeEl.value.trim();
+      const name = nameEl.value.trim();
+      if (!code || !name) {
+        showCatalogStatus('Kode dan nama departemen wajib diisi.', 'error');
+        (!code ? codeEl : nameEl)?.focus();
+        return;
+      }
+      try {
+        await invoke('save_department', {
+          payload: {
+            id: idRaw ? Number(idRaw) : null,
+            code,
+            name,
+            program_description: document.getElementById('cat-dept-desc').value.trim(),
+            competencies: document.getElementById('cat-dept-comp').value.trim(),
+          },
+        });
+        await reloadCertCatalogData();
+        renderCatalogLists();
+        resetDeptForm();
+        await syncMainFormFromCatalog();
+        showCatalogStatus(`Departemen ${code.toUpperCase()} (${name}) tersimpan.`, 'success');
+      } catch (err) {
+        showCatalogStatus(String(err), 'error');
+      }
+    });
+
+    document.getElementById('form-catalog-prog')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearPendingDelete();
+      const idRaw = document.getElementById('cat-prog-id').value.trim();
+      const codeEl = document.getElementById('cat-prog-code');
+      const nameEl = document.getElementById('cat-prog-name');
+      const code = codeEl.value.trim();
+      const name = nameEl.value.trim();
+      const months = Number(document.getElementById('cat-prog-months').value) || 3;
+      if (!code || !name) {
+        showCatalogStatus('Kode dan frasa jenis program wajib diisi.', 'error');
+        (!code ? codeEl : nameEl)?.focus();
+        return;
+      }
+      try {
+        await invoke('save_program_type', {
+          payload: {
+            id: idRaw ? Number(idRaw) : null,
+            code,
+            name,
+            default_duration_months: months,
+            description: document.getElementById('cat-prog-desc').value.trim(),
+          },
+        });
+        await reloadCertCatalogData();
+        renderCatalogLists();
+        resetProgForm();
+        await syncMainFormFromCatalog();
+        showCatalogStatus(`Jenis program ${code.toUpperCase()} tersimpan.`, 'success');
+      } catch (err) {
+        showCatalogStatus(String(err), 'error');
+      }
+    });
   }
 
   function initCertificatesModule() {
@@ -4012,25 +5095,12 @@
     });
 
     noInput?.addEventListener('input', () => {
+      if (noInput.readOnly) return;
       state.certManualNo = Boolean(noInput.value.trim());
     });
     durationInput?.addEventListener('input', () => {
       state.certManualDuration = Boolean(durationInput.value.trim());
-    });
-
-    const onDateRangeChanged = () => {
-      validateCertEndDateCustomValidity();
-      if (!state.certManualDuration && !state.certEditingId && startInput?.value && endInput?.value) {
-        durationInput.value = suggestEnglishDuration(startInput.value, endInput.value);
-        syncCertFieldAria(durationInput, false);
-      }
-    };
-    startInput?.addEventListener('change', onDateRangeChanged);
-    endInput?.addEventListener('change', onDateRangeChanged);
-
-    issuedInput?.addEventListener('change', async () => {
-      await refreshNextCertNoIfAuto();
-      scheduleCertPreview(true);
+      updateDivisionDurationBalance();
     });
 
     form.addEventListener('input', (e) => {
@@ -4038,14 +5108,55 @@
         state.certEditingStatus = 'active';
       }
       if (e.target.hasAttribute?.('aria-invalid')) syncCertFieldAria(e.target, false);
+      if (e.target.classList?.contains('cert-div-duration')) {
+        updateDivisionDurationBalance();
+      }
+      handleCertFormMutated();
       scheduleCertPreview(false);
     });
 
-    form.addEventListener('change', (e) => {
+    form.addEventListener('change', async (e) => {
+      const t = e.target;
       if (!state.certEditingId && state.certEditingStatus !== 'active') {
         state.certEditingStatus = 'active';
       }
-      syncCertFieldAria(e.target, false);
+
+      if (t.id === 'cert-start' || t.id === 'cert-end') {
+        state.certManualDates = true;
+        validateCertEndDateCustomValidity();
+        if (!state.certManualDuration && !state.certEditingId && startInput?.value && endInput?.value) {
+          durationInput.value = suggestEnglishDuration(startInput.value, endInput.value);
+          syncCertFieldAria(durationInput, false);
+        }
+      } else if (t.id === 'cert-program-type') {
+        const pt = (state.certProgramTypes || []).find((p) => p.code === t.value);
+        const programInput = document.getElementById('cert-program');
+        if (pt && programInput) {
+          programInput.value = pt.name;
+          if (!state.certEditingId && !state.certManualDates && endInput?.value) {
+            startInput.value = pt.code.toUpperCase() === 'WS'
+              ? endInput.value
+              : shiftDateByMonthsIso(endInput.value, pt.default_duration_months);
+            if (!state.certManualDuration) {
+              durationInput.value = suggestEnglishDuration(startInput.value, endInput.value);
+            }
+          }
+        }
+      } else if (t.id === 'cert-issued') {
+        await refreshNextCertNoIfAuto();
+      } else if (t.classList?.contains('cert-div-name')) {
+        renderDeptCriteriaPanel();
+        await refreshNextCertNoIfAuto();
+      } else if (t.id === 'cert-achievement-preset') {
+        const achInput = document.getElementById('cert-achievement');
+        if (achInput && t.value !== '__custom__') {
+          achInput.value = t.value;
+        }
+      }
+
+      updateDivisionDurationBalance();
+      syncCertFieldAria(t, false);
+      handleCertFormMutated();
       scheduleCertPreview(true);
     });
 
@@ -4063,12 +5174,13 @@
       if (rows.length >= CERT_MAX_DIVISIONS) return;
       rows.push({ name: '', duration: '' });
       renderDivisionRows(rows);
-      const inputs = document.querySelectorAll('#cert-divisions-list .cert-div-name');
-      inputs[inputs.length - 1]?.focus();
+      const selects = document.querySelectorAll('#cert-divisions-list .cert-div-name');
+      selects[selects.length - 1]?.focus();
+      handleCertFormMutated();
       scheduleCertPreview(false);
     });
 
-    document.getElementById('cert-divisions-list')?.addEventListener('click', (e) => {
+    document.getElementById('cert-divisions-list')?.addEventListener('click', async (e) => {
       const removeBtn = e.target.closest('[data-remove-div]');
       if (!removeBtn) return;
       const idx = Number(removeBtn.dataset.removeDiv);
@@ -4079,12 +5191,31 @@
         rows.splice(idx, 1);
         renderDivisionRows(rows);
       }
+      await refreshNextCertNoIfAuto();
+      handleCertFormMutated();
       scheduleCertPreview(true);
     });
 
-    document.getElementById('cert-achievement-preset')?.addEventListener('change', (e) => {
+    document.getElementById('btn-apply-dept-desc')?.addEventListener('click', () => {
+      const desc = document.getElementById('cert-dept-criteria-desc')?.textContent?.trim();
       const achInput = document.getElementById('cert-achievement');
-      if (achInput) achInput.value = e.target.value;
+      if (!desc || !achInput) return;
+      achInput.value = /[.!?]$/.test(desc) ? desc : `${desc}.`;
+      syncAchievementPresetSelect();
+      handleCertFormMutated();
+      scheduleCertPreview(true);
+    });
+
+    document.getElementById('btn-apply-dept-comp')?.addEventListener('click', () => {
+      const boxes = Array.from(document.querySelectorAll('#cert-dept-competencies-list .cert-comp-checkbox'));
+      if (!boxes.length) return;
+      let picked = boxes.filter((b) => b.checked).map((b) => b.value.trim()).filter(Boolean);
+      if (!picked.length) picked = boxes.map((b) => b.value.trim()).filter(Boolean);
+      const achInput = document.getElementById('cert-achievement');
+      if (!achInput || !picked.length) return;
+      achInput.value = formatCompetencySentence(picked);
+      syncAchievementPresetSelect();
+      handleCertFormMutated();
       scheduleCertPreview(true);
     });
 
@@ -4097,13 +5228,18 @@
     });
 
     document.getElementById('btn-cert-auto-no')?.addEventListener('click', async () => {
+      if (state.certEditingId || noInput?.readOnly) return;
       state.certManualNo = false;
-      const issuedVal = issuedInput?.value;
-      const m = issuedVal && /^(\d{4})/.exec(issuedVal);
-      const y = m ? parseInt(m[1], 10) : new Date().getFullYear();
+      const { year, month } = getIssuedYearAndMonth();
+      const departmentCode = getSelectedDepartmentCode();
       try {
-        noInput.value = await invoke('get_next_certificate_no', { year: y });
+        noInput.value = await invoke('get_next_certificate_no', {
+          year,
+          month,
+          departmentCode,
+        });
         syncCertFieldAria(noInput, false);
+        handleCertFormMutated();
         scheduleCertPreview(true);
       } catch (err) {
         showCertStatus(String(err), 'error');
@@ -4111,8 +5247,21 @@
     });
 
     const resetToNew = async () => {
+      if (isCertFormDirty()) {
+        const discard = await appConfirm(
+          'Draf sertifikat saat ini belum disimpan ke database. Buang perubahan dan mulai formulir baru?',
+          'Buang Draf Sertifikat',
+          'warning',
+          'Buang Draf',
+          'Batal'
+        );
+        if (!discard) return;
+      }
+      clearCertDraftFromStorage();
+      exitArchivePreviewMode({ skipPreview: true });
       applyCertDefaultsToForm({ keepBatchFields: false });
       await refreshNextCertNoIfAuto();
+      markCertFormClean();
       showCertStatus('');
       scheduleCertPreview(true);
       document.getElementById('cert-recipient')?.focus();
@@ -4120,9 +5269,20 @@
     document.getElementById('btn-cert-reset')?.addEventListener('click', resetToNew);
     document.getElementById('btn-cert-cancel-edit')?.addEventListener('click', resetToNew);
 
-    document.getElementById('btn-cert-export-pdf')?.addEventListener('click', () => exportCertificateFormat('pdf'));
-    document.getElementById('btn-cert-export-png')?.addEventListener('click', () => exportCertificateFormat('png'));
-    document.getElementById('btn-cert-print')?.addEventListener('click', () => printCertificateDocument());
+    document.getElementById('btn-cert-back-to-draft')?.addEventListener('click', () => {
+      exitArchivePreviewMode();
+      showCertStatus('Kembali ke pratinjau formulir aktif.', 'info');
+    });
+
+    document.getElementById('btn-cert-export-pdf')?.addEventListener('click', () => exportCertificateFormat('pdf', state.certPreviewRow));
+    document.getElementById('btn-cert-export-png')?.addEventListener('click', () => exportCertificateFormat('png', state.certPreviewRow));
+    document.getElementById('btn-cert-print')?.addEventListener('click', () => printCertificateDocument(state.certPreviewRow));
+
+    const persistDirtyDraftOnExit = () => {
+      if (isCertFormDirty()) saveCertDraftToStorage();
+    };
+    window.addEventListener('pagehide', persistDirtyDraftOnExit);
+    window.addEventListener('beforeunload', persistDirtyDraftOnExit);
 
     // History Filters & Pagination
     const filterForm = document.getElementById('form-cert-filter');
@@ -4173,8 +5333,7 @@
       if (!row) return;
 
       if (action === 'preview') {
-        populateCertFormFromRow(row, false);
-        showCertStatus(`Menampilkan pratinjau ${row.certificate_no} (${row.recipient_name}).`, 'info');
+        enterArchivePreviewMode(row);
       } else if (action === 'pdf') {
         await exportCertificateFormat('pdf', row);
       } else if (action === 'png') {
@@ -4182,7 +5341,20 @@
       } else if (action === 'print') {
         await printCertificateDocument(row);
       } else if (action === 'edit') {
+        if (isCertFormDirty()) {
+          const replace = await appConfirm(
+            'Formulir saat ini memiliki perubahan sertifikat yang belum disimpan ke database. Muat data lain untuk diedit dan buang draf saat ini?',
+            'Konfirmasi Ganti Formulir',
+            'warning',
+            'Ya, Timpa',
+            'Batal'
+          );
+          if (!replace) return;
+        }
+        clearCertDraftFromStorage();
+        exitArchivePreviewMode({ skipPreview: true });
         populateCertFormFromRow(row, true);
+        markCertFormClean();
       } else if (action === 'toggle-status') {
         const nextStatus = row.status === 'revoked' ? 'active' : 'revoked';
         const prompt = nextStatus === 'revoked'
@@ -4192,7 +5364,10 @@
         try {
           const updated = await invoke('set_certificate_status', { id: row.id, status: nextStatus });
           await loadCertificatesHistory();
-          if (document.getElementById('cert-no')?.value?.trim() === row.certificate_no) {
+          if (state.certPreviewRow?.id === row.id) {
+            state.certPreviewRow = updated;
+            await refreshCertPreview(rowToCertificateRenderPayload(updated));
+          } else if (state.certEditingId === row.id) {
             state.certEditingStatus = updated.status;
             await refreshCertPreview();
           }
@@ -4212,10 +5387,19 @@
         try {
           await invoke('delete_certificate', { id: row.id });
           if (state.certEditingId === row.id) {
+            clearCertDraftFromStorage();
             applyCertDefaultsToForm({ keepBatchFields: false });
             await refreshNextCertNoIfAuto();
+            markCertFormClean();
           }
-          await Promise.all([refreshCertificateYears(), loadCertificatesHistory(), refreshCertPreview()]);
+          if (state.certPreviewRow?.id === row.id) {
+            exitArchivePreviewMode({ skipPreview: true });
+          }
+          await Promise.all([
+            refreshCertificateYears(),
+            loadCertificatesHistory(),
+            refreshCertPreview(state.certPreviewRow ? rowToCertificateRenderPayload(state.certPreviewRow) : null),
+          ]);
           showCertStatus(`Sertifikat ${row.certificate_no} dihapus dari database.`, 'success');
         } catch (err) {
           showCertStatus(String(err), 'error');
@@ -4239,13 +5423,16 @@
 
     document.getElementById('btn-close-cert-settings')?.addEventListener('click', () => settingsDialog?.close());
     document.getElementById('btn-cancel-cert-settings')?.addEventListener('click', () => settingsDialog?.close());
+    document.getElementById('btn-reset-cert-template')?.addEventListener('click', () => {
+      document.getElementById('cfg-cert-template').value = DEFAULT_CERT_BODY_TEMPLATE;
+    });
 
     document.getElementById('btn-cfg-upload-logo')?.addEventListener('click', async () => {
       try {
         const cfg = await invoke('upload_certificate_asset', { kind: 'logo' });
         if (!cfg) return;
         applyCertSettingsToDialog(cfg);
-        await refreshCertPreview();
+        await refreshCertPreview(state.certPreviewRow ? rowToCertificateRenderPayload(state.certPreviewRow) : null);
         showCertStatus('Logo sertifikat kustom diperbarui.', 'success');
       } catch (err) {
         alert(String(err));
@@ -4256,7 +5443,7 @@
       try {
         const cfg = await invoke('clear_certificate_asset', { kind: 'logo' });
         applyCertSettingsToDialog(cfg);
-        await refreshCertPreview();
+        await refreshCertPreview(state.certPreviewRow ? rowToCertificateRenderPayload(state.certPreviewRow) : null);
         showCertStatus('Logo sertifikat dikembalikan ke logo bawaan Anda Bungalows.', 'success');
       } catch (err) {
         alert(String(err));
@@ -4268,7 +5455,7 @@
         const cfg = await invoke('upload_certificate_asset', { kind: 'signature' });
         if (!cfg) return;
         applyCertSettingsToDialog(cfg);
-        await refreshCertPreview();
+        await refreshCertPreview(state.certPreviewRow ? rowToCertificateRenderPayload(state.certPreviewRow) : null);
         showCertStatus('Gambar tanda tangan/stempel diperbarui.', 'success');
       } catch (err) {
         alert(String(err));
@@ -4279,7 +5466,7 @@
       try {
         const cfg = await invoke('clear_certificate_asset', { kind: 'signature' });
         applyCertSettingsToDialog(cfg);
-        await refreshCertPreview();
+        await refreshCertPreview(state.certPreviewRow ? rowToCertificateRenderPayload(state.certPreviewRow) : null);
         showCertStatus('Gambar tanda tangan dihapus (mode tanda tangan basah).', 'info');
       } catch (err) {
         alert(String(err));
@@ -4289,33 +5476,46 @@
     settingsForm?.addEventListener('submit', async (e) => {
       e.preventDefault();
       try {
+        const wasDirty = isCertFormDirty();
         const cfg = await invoke('update_certificate_settings', {
           signerName: document.getElementById('cfg-cert-signer').value.trim(),
           signerTitle: document.getElementById('cfg-cert-title').value.trim(),
           programName: document.getElementById('cfg-cert-program').value.trim(),
           paperSize: document.getElementById('cfg-cert-paper').value,
           showSignature: document.getElementById('cfg-cert-show-sig').checked,
+          issuedCity: document.getElementById('cfg-cert-city').value.trim(),
+          bodyTemplate: document.getElementById('cfg-cert-template').value.trim(),
         });
         applyCertSettingsToDialog(cfg);
         if (!state.certEditingId) {
           document.getElementById('cert-signer').value = cfg.signer_name;
           document.getElementById('cert-signer-title').value = cfg.signer_title;
-          document.getElementById('cert-program').value = cfg.program_name;
+          document.getElementById('cert-issued-city').value = cfg.issued_city || DEFAULT_CERT_ISSUED_CITY;
+          if (!document.getElementById('cert-program-type')?.value) {
+            document.getElementById('cert-program').value = cfg.program_name;
+          }
           setSelectedCertPaperSize(cfg.paper_size);
         }
+        if (!wasDirty) {
+          markCertFormClean();
+        } else {
+          saveCertDraftToStorage();
+        }
         settingsDialog?.close();
-        await refreshCertPreview();
+        await refreshCertPreview(state.certPreviewRow ? rowToCertificateRenderPayload(state.certPreviewRow) : null);
         showCertStatus('Pengaturan default sertifikat disimpan.', 'success');
       } catch (err) {
         alert(String(err));
       }
     });
+
+    initCertCatalogDialog();
   }
 
   // DOM Content Loaded Entrypoint
   document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('form').forEach(form => {
-      if (form.id === 'form-certificate' || form.id === 'form-cert-filter' || form.id === 'form-cert-settings') return;
+      if (['form-certificate', 'form-cert-filter', 'form-cert-settings', 'form-catalog-dept', 'form-catalog-prog'].includes(form.id)) return;
       form.addEventListener('submit', (e) => e.preventDefault());
     });
     initAuth();
