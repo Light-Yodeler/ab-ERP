@@ -68,8 +68,3 @@ cargo test --manifest-path src-tauri/Cargo.toml
 
 Rangkaian `cargo test` menjalankan 27 kasus uji yang tersebar di unit test [src-tauri/src/lib.rs](src-tauri/src/lib.rs) (2 kasus), [tests/certificate_tests.rs](tests/certificate_tests.rs) (9 kasus: penomoran `ABR-{KODE}`/`ABR-ROT` dan non-reuse urutan tahunan, CRUD/paginasi tanggal fleksibel, resolusi font & geometri SVG F4/A4 rotasi 2-3 divisi, PDF MediaBox & PNG 300 DPI, validasi aset, regresi batas negatif/migrasi/TTD multi-baris, CRUD & preservasi urutan katalog departemen/program, normalisasi nama/gelar & template bervariabel, serta penguncian nomor pasca terbit & pemblokiran durasi divisi berlebih), [tests/erp_core_tests.rs](tests/erp_core_tests.rs) (8 kasus: autentikasi, CRUD dan sinkronisasi tanggal fleksibel, rekap pajak, impor 13 kolom, Form 1, dan backup/restore), [tests/optimizer_tests.rs](tests/optimizer_tests.rs) (7 kasus: solver subset-sum, ekspor berumus 2 kolom/13 kolom, pencegahan bentrok jadwal kamar termasuk tanggal teks `DD/MM-YY`), serta [tests/smoke_verify.rs](tests/smoke_verify.rs) (1 kasus).
 
----
-
-## Lisensi
-
-Hak Cipta (c) 2024 Muhammad Syahid Ramadhon. Dilindungi undang-undang.
