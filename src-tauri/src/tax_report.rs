@@ -35,6 +35,7 @@ pub struct TaxRecapReport {
     pub npwpd: String,
     pub business_name: String,
     pub business_address: String,
+    pub business_contact: String,
     pub sign_position: String,
     pub sign_name: String,
     pub officer_name: String,
@@ -211,7 +212,8 @@ pub fn generate_tax_recap(
 
     let business_name = settings_map
         .get("businessName")
-        .cloned()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
         .unwrap_or_else(|| "ANDA BUNGALOWS & RESTAURANT".to_string());
     let business_address = unit_address.unwrap_or_else(|| {
         settings_map
@@ -219,6 +221,10 @@ pub fn generate_tax_recap(
             .cloned()
             .unwrap_or_else(|| "Jalan Pariwisata Pantai Kuta, Lombok Tengah".to_string())
     });
+    let business_contact = settings_map
+        .get("contactNumber")
+        .map(|s| s.trim().to_string())
+        .unwrap_or_else(|| "HP/WhatsApp: +62818-0578-3810".to_string());
     let npwpd = unit_npwpd.unwrap_or_else(|| {
         settings_map
             .get("npwpd")
@@ -341,6 +347,7 @@ pub fn generate_tax_recap(
         npwpd,
         business_name,
         business_address,
+        business_contact,
         sign_position,
         sign_name,
         officer_name,

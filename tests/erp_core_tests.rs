@@ -2,7 +2,7 @@ use excel_subset_lib::auth::{authenticate, hash_pin, verify_pin};
 use excel_subset_lib::db::{
     add_transaction, backup_database, clean_duplicate_transactions, delete_period_transactions,
     delete_transaction, get_available_months, get_paginated_transactions, get_settings, get_units,
-    init_db, restore_database, update_transaction,
+    init_db, restore_database, update_settings, update_transaction,
 };
 use excel_subset_lib::tax_report::{generate_tax_recap, generate_tourism_report};
 use std::fs;
@@ -127,6 +127,15 @@ fn test_tax_recap_report_computation() {
     assert_eq!(recap.min_daily_revenue_non_zero, 2000000.0);
 
     assert!(recap.document_number.starts_with("No: ANDA-BGW/2026-08/"));
+    assert_eq!(recap.business_contact, "HP/WhatsApp: +62818-0578-3810");
+
+    let mut upd_settings = std::collections::HashMap::new();
+    upd_settings.insert("contactNumber".to_string(), "WA: +62812-3456-7890".to_string());
+    upd_settings.insert("businessName".to_string(), "PT ANDA HOSPITALITY".to_string());
+    update_settings(&conn, &upd_settings).expect("update profile settings");
+    let recap_updated = generate_tax_recap(&conn, "Bungalows", "2026-08").expect("recap after settings");
+    assert_eq!(recap_updated.business_contact, "WA: +62812-3456-7890");
+    assert_eq!(recap_updated.business_name, "PT ANDA HOSPITALITY");
 
     let months = get_available_months(&conn, Some("Bungalows")).unwrap();
     assert_eq!(months, vec!["2026-08"]);

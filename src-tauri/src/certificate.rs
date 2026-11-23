@@ -94,6 +94,7 @@ pub struct CertificateRenderData {
     pub issued_date: String,
     pub issued_city: Option<String>,
     pub body_template: String,
+    pub property_heading: String,
     pub property_name: String,
     pub date_range_display: String,
     pub department: Option<String>,
@@ -243,6 +244,12 @@ impl CertificateRenderData {
             }
         };
 
+        let raw_business_name = settings
+            .get("businessName")
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .unwrap_or("ANDA BUNGALOWS & RESTAURANT");
+
         Self {
             certificate_no: non_empty(&input.certificate_no, "[000/ABR/I/YYYY]"),
             recipient_name,
@@ -254,7 +261,8 @@ impl CertificateRenderData {
             issued_date,
             issued_city,
             body_template: non_empty(&input.body_template, default_template),
-            property_name: DEFAULT_PROPERTY_NAME.to_string(),
+            property_heading: raw_business_name.to_uppercase(),
+            property_name: format_property_name_for_body(raw_business_name),
             date_range_display: format_english_date_range(
                 input.start_date.as_deref(),
                 input.end_date.as_deref(),
@@ -274,6 +282,33 @@ impl CertificateRenderData {
                 .unwrap_or(false),
         }
     }
+}
+
+fn format_property_name_for_body(raw: &str) -> String {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return DEFAULT_PROPERTY_NAME.to_string();
+    }
+    let has_upper = trimmed.chars().any(|c| c.is_uppercase());
+    let has_lower = trimmed.chars().any(|c| c.is_lowercase());
+    if has_upper && !has_lower {
+        return trimmed
+            .split_whitespace()
+            .map(|w| {
+                let upper = w.to_ascii_uppercase();
+                if matches!(
+                    upper.as_str(),
+                    "PT" | "PT." | "CV" | "CV." | "UD" | "UD." | "TBK" | "TBK." | "&"
+                ) {
+                    upper
+                } else {
+                    capitalize_word(w)
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" ");
+    }
+    trimmed.to_string()
 }
 
 fn capitalize_word(word: &str) -> String {
@@ -1164,20 +1199,22 @@ pub fn render_certificate_svg(data: &CertificateRenderData) -> String {
     let cert_no_x = page_w - 20.0;
     let cert_no_y = 21.25;
 
+    let top_off = y_off * 0.6;
+
     let logo_w = 58.49;
     let logo_h = 30.95;
     let logo_x = cx - (logo_w / 2.0);
-    let logo_y = 13.63 + y_off;
+    let logo_y = 12.60 + top_off;
 
     let brand_fs = pt_to_mm(17.0);
     let brand_ls = brand_fs * 0.09;
-    let brand_y = 49.14 + y_off + 5.55;
+    let brand_y = 47.20 + top_off + 5.55;
 
     let title_fs = pt_to_mm(44.2);
-    let title_y = 69.17 + y_off + 14.30;
+    let title_y = 64.50 + top_off + 14.30;
 
     let sub_fs = pt_to_mm(15.0);
-    let sub_y = 98.00 + y_off + 4.85;
+    let sub_y = 92.20 + top_off + 4.85;
 
     let name_chars = data.recipient_name.chars().count();
     let recip_pt = if name_chars <= 26 {
@@ -1186,19 +1223,19 @@ pub fn render_certificate_svg(data: &CertificateRenderData) -> String {
         (38.0 * 26.0 / (name_chars as f64)).max(22.0)
     };
     let recip_fs = pt_to_mm(recip_pt);
-    let recip_y = 116.34 + y_off + 8.0 + (recip_fs * 0.32);
+    let recip_y = 109.20 + top_off + 8.0 + (recip_fs * 0.32);
 
     let body_lines = build_body_lines(data);
     let issued_line = format_issued_line(data);
     let line_count = body_lines.len();
     let visual_lines = line_count + usize::from(issued_line.is_some());
     let (body_pt, body_step, body_first_y) = match visual_lines {
-        0..=2 => (11.0_f64, pt_to_mm(11.0) * 1.60, 148.20 + y_off + 3.55),
-        3 => (11.0_f64, pt_to_mm(11.0) * 1.50, 145.00 + y_off + 3.55),
-        4 => (10.5_f64, 5.20_f64, 142.20 + y_off + 3.40),
-        5 => (10.0_f64, 4.70_f64, 139.80 + y_off + 3.20),
-        6 => (9.2_f64, 4.10_f64, 137.40 + y_off + 2.95),
-        _ => (8.6_f64, 3.70_f64, 135.80 + y_off + 2.75),
+        0..=2 => (11.0_f64, pt_to_mm(11.0) * 1.55, 139.50 + top_off + 3.55),
+        3 => (11.0_f64, 5.60_f64, 136.50 + top_off + 3.55),
+        4 => (10.5_f64, 5.00_f64, 134.20 + top_off + 3.40),
+        5 => (10.0_f64, 4.50_f64, 132.40 + top_off + 3.20),
+        6 => (9.2_f64, 4.00_f64, 130.60 + top_off + 2.95),
+        _ => (8.6_f64, 3.55_f64, 129.20 + top_off + 2.75),
     };
     let body_fs = pt_to_mm(body_pt);
     let body_markup: String = body_lines
@@ -1221,7 +1258,7 @@ pub fn render_certificate_svg(data: &CertificateRenderData) -> String {
         let issued_gap = if line_count == 0 {
             0.0
         } else {
-            body_step + 1.4
+            body_step + 1.0
         };
         let issued_y = if line_count == 0 {
             body_first_y
@@ -1247,24 +1284,24 @@ pub fn render_certificate_svg(data: &CertificateRenderData) -> String {
 
     let signer_fs = pt_to_mm(13.4);
     let signer_ls = signer_fs * 0.025;
-    let signer_y = 176.00 + y_off + 4.40;
+    let signer_y = 181.50 + y_off + 4.40;
 
-    let divider_y = 184.06 + y_off;
+    let divider_y = 189.56 + y_off;
     let divider_half = 50.26 / 2.0;
 
     let role_fs = pt_to_mm(7.8);
     let role_ls = role_fs * 0.08;
-    let role_y = 185.64 + y_off + 2.55;
+    let role_y = 191.14 + y_off + 2.55;
 
     let mut sig_markup = String::new();
     if data.show_signature {
         if let Some(sig_uri) = &data.signature_data_uri {
-            let sig_w = 44.0;
+            let sig_w = 50.0;
             let signer_top_y = signer_y - 4.0;
             let max_sig_top = body_bottom_y + 1.5;
             let available = (signer_top_y - max_sig_top).max(0.0);
             if available >= 4.0 {
-                let sig_h = available.min(13.0);
+                let sig_h = available.min(20.0);
                 let sig_y = signer_top_y - sig_h;
                 let sig_x = cx - (sig_w / 2.0);
                 sig_markup = format!(
@@ -1295,7 +1332,7 @@ pub fn render_certificate_svg(data: &CertificateRenderData) -> String {
 <rect x=\"10\" y=\"10\" width=\"{frame_w:.2}\" height=\"{frame_h:.2}\" fill=\"none\" stroke=\"#C67D24\" stroke-width=\"0.53\"/>\
 <text x=\"{cert_no_x:.2}\" y=\"{cert_no_y:.2}\" text-anchor=\"end\" font-family=\"'Nunito Sans Condensed', sans-serif\" font-weight=\"400\" font-size=\"{cert_no_fs:.3}\" letter-spacing=\"{cert_no_ls:.3}\" fill=\"#545454\">Certificate No. {cert_no}</text>\
 <image x=\"{logo_x:.2}\" y=\"{logo_y:.2}\" width=\"{logo_w:.2}\" height=\"{logo_h:.2}\" preserveAspectRatio=\"xMidYMid meet\" href=\"{logo_uri}\"/>\
-<text x=\"{cx:.2}\" y=\"{brand_y:.2}\" text-anchor=\"middle\" font-family=\"'Nunito Sans Condensed', sans-serif\" font-weight=\"400\" font-size=\"{brand_fs:.3}\" letter-spacing=\"{brand_ls:.3}\" fill=\"#000000\">ANDA BUNGALOWS &amp; RESTAURANT</text>\
+<text x=\"{cx:.2}\" y=\"{brand_y:.2}\" text-anchor=\"middle\" font-family=\"'Nunito Sans Condensed', sans-serif\" font-weight=\"400\" font-size=\"{brand_fs:.3}\" letter-spacing=\"{brand_ls:.3}\" fill=\"#000000\">{property_heading}</text>\
 <text x=\"{cx:.2}\" y=\"{title_y:.2}\" text-anchor=\"middle\" font-family=\"'Source Serif Pro', serif\" font-weight=\"400\" font-size=\"{title_fs:.3}\" fill=\"#1F1F1F\">Certificate of Completion</text>\
 <text x=\"{cx:.2}\" y=\"{sub_y:.2}\" text-anchor=\"middle\" font-family=\"'Libre Baskerville', serif\" font-weight=\"400\" font-size=\"{sub_fs:.3}\" fill=\"#000000\">This certificate is proudly presented to</text>\
 <text x=\"{cx:.2}\" y=\"{recip_y:.2}\" text-anchor=\"middle\" font-family=\"'Source Serif Pro', serif\" font-weight=\"700\" font-size=\"{recip_fs:.3}\" fill=\"#000000\">{recipient}</text>\
@@ -1327,6 +1364,7 @@ pub fn render_certificate_svg(data: &CertificateRenderData) -> String {
         brand_y = brand_y,
         brand_fs = brand_fs,
         brand_ls = brand_ls,
+        property_heading = escape_xml(&data.property_heading),
         title_y = title_y,
         title_fs = title_fs,
         sub_y = sub_y,

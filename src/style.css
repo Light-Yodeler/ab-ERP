@@ -1140,6 +1140,17 @@ html, body {
   font-size: 11.5px;
 }
 
+.icon,
+.tab-icon,
+.chevron-icon,
+.dropzone-icon,
+.brand-badge-icon svg,
+.login-brand-icon svg,
+.dialog-icon-circle svg {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .dialog-icon-circle {
   width: 52px;
   height: 52px;

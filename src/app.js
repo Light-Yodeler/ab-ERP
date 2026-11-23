@@ -80,6 +80,7 @@
         npwpd: 'P.2.0001234.01.23',
         business_name: 'ANDA BUNGALOWS & RESTAURANT',
         business_address: 'Jalan Pariwisata Pantai Kuta, Kecamatan Pujut, Lombok Tengah, NTB',
+        business_contact: 'HP/WhatsApp: +62818-0578-3810',
         sign_position: 'Wajib Pajak Daerah',
         sign_name: 'Pimpinan / Pengelola',
         officer_name: 'Petugas Bapenda Lombok Tengah',
@@ -139,6 +140,7 @@
       return {
         businessName: 'ANDA BUNGALOWS & RESTAURANT',
         businessAddress: 'Jalan Pariwisata Pantai Kuta, Lombok Tengah, NTB',
+        contactNumber: 'HP/WhatsApp: +62818-0578-3810',
         npwpd: 'P.2.0001234.01.23',
         signPosition: 'Wajib Pajak Daerah',
         signName: 'Pimpinan / Pengelola',
@@ -1317,6 +1319,11 @@
     if (pCompanyName) pCompanyName.textContent = r.business_name || 'ANDA BUNGALOWS & RESTAURANT';
     document.getElementById('p-npwpd-head').textContent = r.npwpd;
     document.getElementById('p-company-address').textContent = r.business_address;
+    const contactText = String(r.business_contact || '').trim();
+    const contactWrap = document.getElementById('p-company-contact-wrap');
+    const contactSpan = document.getElementById('p-company-contact');
+    if (contactSpan) contactSpan.textContent = contactText;
+    if (contactWrap) contactWrap.classList.toggle('hidden', !contactText);
     document.getElementById('p-period-badge').textContent = `Periode: ${r.month_name}`;
 
     // Subline
@@ -1555,11 +1562,11 @@
         if (!confirmed) return;
         try {
           const removed = await invoke('clean_duplicate_transactions', { unit: state.activeUnit });
-          alert(`Berhasil menghapus ${removed} transaksi duplikat.`);
+          appSuccess(`Berhasil menghapus ${removed} transaksi duplikat.`);
           await loadLedgerData();
           await loadRecapData();
         } catch (err) {
-          alert(`Gagal: ${err}`);
+          appError(`Gagal: ${err}`, 'Gagal');
         }
       });
     }
@@ -1580,9 +1587,9 @@
             unit: state.activeUnit,
             month: monthArg,
           });
-          alert(msg);
+          appSuccess(msg);
         } catch (err) {
-          alert(`Gagal mengekspor Excel 13 kolom: ${err}`);
+          appError(`Gagal mengekspor Excel 13 kolom: ${err}`, 'Gagal');
         }
       });
     }
@@ -1710,7 +1717,7 @@
                   await loadRecapData();
                   await loadTourismData();
                 } catch (err) {
-                  alert(`Gagal menghapus reservasi: ${err}`);
+                  appError(`Gagal menghapus reservasi: ${err}`, 'Gagal');
                 }
               });
             });
@@ -1800,7 +1807,7 @@
                 await loadRecapData();
                 await loadTourismData();
               } catch (err) {
-                alert(`Gagal menghapus: ${err}`);
+                appError(`Gagal menghapus: ${err}`, 'Gagal');
               }
             });
           });
@@ -1864,7 +1871,7 @@
     const notes = document.getElementById('trans-notes').value.trim();
 
     if (!unit || !date || isNaN(amount) || amount < 0) {
-      alert('Mohon isi tanggal dan nominal pendapatan dengan benar.');
+      appAlert('Mohon isi tanggal dan nominal pendapatan dengan benar.', 'Periksa Input', 'warning');
       return;
     }
 
@@ -1893,7 +1900,7 @@
       await loadRecapData();
       await loadTourismData();
     } catch (err) {
-      alert(`Gagal menyimpan: ${err}`);
+      appError(`Gagal menyimpan: ${err}`, 'Gagal');
     }
   }
 
@@ -1958,23 +1965,23 @@
     const remarks = document.getElementById('res-remarks').value.trim();
 
     if (!id || !guestName || !date || !checkInDate || !checkOutDate) {
-      alert('Tanggal pembukuan, nama tamu, Check In, dan Check Out wajib diisi.');
+      appAlert('Tanggal pembukuan, nama tamu, Check In, dan Check Out wajib diisi.', 'Periksa Input', 'warning');
       return;
     }
     if (checkOutDate <= checkInDate) {
-      alert('Tanggal Check Out harus setelah tanggal Check In.');
+      appAlert('Tanggal Check Out harus setelah tanggal Check In.', 'Periksa Input', 'warning');
       return;
     }
     if (Number.isNaN(totalPerson) || totalPerson < 1) {
-      alert('Total person minimal 1 orang.');
+      appAlert('Total person minimal 1 orang.', 'Periksa Input', 'warning');
       return;
     }
     if (Number.isNaN(totalRooms) || totalRooms < 1) {
-      alert('Total Kamar minimal 1 kamar.');
+      appAlert('Total Kamar minimal 1 kamar.', 'Periksa Input', 'warning');
       return;
     }
     if (Number.isNaN(totalPayment) || totalPayment < 0) {
-      alert('Total Payment harus bernilai 0 atau lebih.');
+      appAlert('Total Payment harus bernilai 0 atau lebih.', 'Periksa Input', 'warning');
       return;
     }
 
@@ -2003,7 +2010,7 @@
       await loadRecapData();
       await loadTourismData();
     } catch (err) {
-      alert(`Gagal memperbarui reservasi: ${err}`);
+      appError(`Gagal memperbarui reservasi: ${err}`, 'Gagal');
     }
   }
 
@@ -2049,15 +2056,15 @@
       let iconHtml = '';
       if (type === 'error') {
         btnConfirm.className = 'btn btn-danger';
-        iconHtml = `<div class="dialog-icon-circle error"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg></div>`;
+        iconHtml = `<div class="dialog-icon-circle error"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg></div>`;
       } else if (type === 'warning') {
         btnConfirm.className = 'btn btn-warning';
-        iconHtml = `<div class="dialog-icon-circle warning"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></div>`;
+        iconHtml = `<div class="dialog-icon-circle warning"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><circle cx="12" cy="17" r="1.25" fill="currentColor" stroke="none"></circle></svg></div>`;
       } else if (type === 'success') {
         btnConfirm.className = 'btn btn-success';
-        iconHtml = `<div class="dialog-icon-circle success"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></div>`;
+        iconHtml = `<div class="dialog-icon-circle success"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></div>`;
       } else {
-        iconHtml = `<div class="dialog-icon-circle info"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></div>`;
+        iconHtml = `<div class="dialog-icon-circle info"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><circle cx="12" cy="8" r="1.25" fill="currentColor" stroke="none"></circle></svg></div>`;
       }
       if (iconContainer) iconContainer.innerHTML = iconHtml;
 
@@ -2515,7 +2522,7 @@
         const path = await invoke('pick_excel_file');
         if (path) await analyzeOptimizerFile(path);
       } catch (err) {
-        alert(`Gagal: ${err}`);
+        appError(`Gagal: ${err}`, 'Gagal');
       }
     }
 
@@ -2657,7 +2664,7 @@
 
       document.getElementById('btn-run-solver').disabled = false;
     } catch (err) {
-      alert(`Gagal menganalisis berkas Excel: ${err}`);
+      appError(`Gagal menganalisis berkas Excel: ${err}`, 'Gagal');
     }
   }
 
@@ -2666,7 +2673,7 @@
 
     const target = parseFloat(document.getElementById('opt-input-target').value);
     if (Number.isNaN(target) || !Number.isFinite(target) || target <= 0) {
-      alert('Target nominal harus berupa angka lebih besar dari 0.');
+      appAlert('Target nominal harus berupa angka lebih besar dari 0.', 'Periksa Input', 'warning');
       return;
     }
     const tolerance = parseFloat(document.getElementById('opt-select-tolerance').value);
@@ -2705,7 +2712,7 @@
       // Render Preview Table
       renderOptimizerPreview(result);
     } catch (err) {
-      alert(`Solver: ${err}`);
+      appError(`Solver: ${err}`, 'Gagal');
     }
   }
 
@@ -2850,9 +2857,9 @@
         items: state.optAnalysis.items,
         selectedIndices: state.optResult.selected_indices,
       });
-      alert(`Berhasil! ${msg}`);
+      appSuccess(`Berhasil! ${msg}`);
     } catch (err) {
-      alert(`Gagal mengekspor: ${err}`);
+      appError(`Gagal mengekspor: ${err}`, 'Gagal');
     }
   }
 
@@ -2896,6 +2903,7 @@
         const settings = {
           businessName: document.getElementById('set-biz-name').value.trim(),
           businessAddress: document.getElementById('set-biz-addr').value.trim(),
+          contactNumber: document.getElementById('set-contact-number')?.value.trim() || '',
           npwpd: document.getElementById('set-npwpd').value.trim(),
           signPosition: document.getElementById('set-sign-pos').value.trim(),
           signName: document.getElementById('set-sign-name').value.trim(),
@@ -2904,10 +2912,14 @@
         };
         try {
           await invoke('update_settings', { settings });
-          alert('Profil usaha dan pengaturan berhasil disimpan!');
+          applyBusinessNameToUi(settings.businessName);
+          appSuccess('Profil usaha dan pengaturan berhasil disimpan!');
           await loadRecapData();
+          if (state.certInitialized) {
+            await refreshCertPreview(state.certPreviewRow ? rowToCertificateRenderPayload(state.certPreviewRow) : null);
+          }
         } catch (err) {
-          alert(`Gagal: ${err}`);
+          appError(`Gagal: ${err}`, 'Gagal');
         }
       });
     }
@@ -2918,9 +2930,9 @@
       btnBackup.addEventListener('click', async () => {
         try {
           const res = await invoke('backup_database_dialog');
-          alert(res);
+          appSuccess(res);
         } catch (err) {
-          alert(`Pencadangan gagal: ${err}`);
+          appError(`Pencadangan gagal: ${err}`, 'Gagal');
         }
       });
     }
@@ -2935,11 +2947,11 @@
         if (!confirmed) return;
         try {
           const res = await invoke('restore_database_dialog');
-          alert(res);
+          appSuccess(res);
           await refreshAvailableMonths();
           await loadActiveView();
         } catch (err) {
-          alert(`Pemulihan gagal: ${err}`);
+          appError(`Pemulihan gagal: ${err}`, 'Gagal');
         }
       });
     }
@@ -2964,21 +2976,29 @@
         const pin = document.getElementById('new-u-pin').value.trim();
 
         if (!username || !fullName || pin.length < 4) {
-          alert('Mohon isi semua data akun dan PIN minimal 4 digit.');
+          appAlert('Mohon isi semua data akun dan PIN minimal 4 digit.', 'Periksa Input', 'warning');
           return;
         }
 
         try {
           await invoke('auth_create_user', { username, fullName, role, pin });
-          alert(`Akun ${username} berhasil dibuat!`);
+          appSuccess(`Akun ${username} berhasil dibuat!`);
           boxAddUser.classList.add('hidden');
           await loadUsersSettings();
           await refreshLoginUsers();
         } catch (err) {
-          alert(`Gagal: ${err}`);
+          appError(`Gagal: ${err}`, 'Gagal');
         }
       });
     }
+  }
+
+  function applyBusinessNameToUi(businessName) {
+    const clean = String(businessName || '').trim() || 'ANDA BUNGALOWS & RESTAURANT';
+    const loginSub = document.getElementById('login-biz-subtitle');
+    if (loginSub) loginSub.textContent = clean;
+    const certNote = document.getElementById('cert-property-note');
+    if (certNote) certNote.textContent = `Properti: ${clean.toUpperCase()}`;
   }
 
   async function loadSettingsData() {
@@ -2986,11 +3006,14 @@
       const s = await invoke('get_settings');
       document.getElementById('set-biz-name').value = s.businessName || '';
       document.getElementById('set-biz-addr').value = s.businessAddress || '';
+      const contactInput = document.getElementById('set-contact-number');
+      if (contactInput) contactInput.value = s.contactNumber || '';
       document.getElementById('set-npwpd').value = s.npwpd || '';
       document.getElementById('set-sign-pos').value = s.signPosition || '';
       document.getElementById('set-sign-name').value = s.signName || '';
       document.getElementById('set-officer-name').value = s.officerName || '';
       document.getElementById('set-officer-nip').value = s.officerNip || '';
+      applyBusinessNameToUi(s.businessName);
     } catch (err) {
       console.error('Gagal mengambil pengaturan:', err);
     }
@@ -3043,7 +3066,7 @@
             await loadUsersSettings();
             await refreshLoginUsers();
           } catch (err) {
-            alert(`Gagal: ${err}`);
+            appError(`Gagal: ${err}`, 'Gagal');
           }
         });
       });
@@ -4035,7 +4058,11 @@
     state.certEditingId = asEdit ? row.id : null;
     state.certEditingStatus = row.status || 'active';
     state.certManualNo = true;
-    state.certManualDuration = true;
+    const suggestedDur = row.start_date && row.end_date
+      ? suggestEnglishDuration(row.start_date, row.end_date)
+      : '';
+    const savedDur = String(row.duration_text || '').trim();
+    state.certManualDuration = Boolean(savedDur) && savedDur.toLowerCase() !== suggestedDur.toLowerCase();
     state.certManualDates = true;
     state.certStaffSavedLock = false;
     setCertNoLocked(Boolean(asEdit));
@@ -5124,7 +5151,7 @@
       if (t.id === 'cert-start' || t.id === 'cert-end') {
         state.certManualDates = true;
         validateCertEndDateCustomValidity();
-        if (!state.certManualDuration && !state.certEditingId && startInput?.value && endInput?.value) {
+        if (!state.certManualDuration && startInput?.value && endInput?.value) {
           durationInput.value = suggestEnglishDuration(startInput.value, endInput.value);
           syncCertFieldAria(durationInput, false);
         }
@@ -5435,7 +5462,7 @@
         await refreshCertPreview(state.certPreviewRow ? rowToCertificateRenderPayload(state.certPreviewRow) : null);
         showCertStatus('Logo sertifikat kustom diperbarui.', 'success');
       } catch (err) {
-        alert(String(err));
+        appError(String(err), 'Gagal');
       }
     });
 
@@ -5446,7 +5473,7 @@
         await refreshCertPreview(state.certPreviewRow ? rowToCertificateRenderPayload(state.certPreviewRow) : null);
         showCertStatus('Logo sertifikat dikembalikan ke logo bawaan Anda Bungalows.', 'success');
       } catch (err) {
-        alert(String(err));
+        appError(String(err), 'Gagal');
       }
     });
 
@@ -5458,7 +5485,7 @@
         await refreshCertPreview(state.certPreviewRow ? rowToCertificateRenderPayload(state.certPreviewRow) : null);
         showCertStatus('Gambar tanda tangan/stempel diperbarui.', 'success');
       } catch (err) {
-        alert(String(err));
+        appError(String(err), 'Gagal');
       }
     });
 
@@ -5469,7 +5496,7 @@
         await refreshCertPreview(state.certPreviewRow ? rowToCertificateRenderPayload(state.certPreviewRow) : null);
         showCertStatus('Gambar tanda tangan dihapus (mode tanda tangan basah).', 'info');
       } catch (err) {
-        alert(String(err));
+        appError(String(err), 'Gagal');
       }
     });
 
@@ -5505,7 +5532,7 @@
         await refreshCertPreview(state.certPreviewRow ? rowToCertificateRenderPayload(state.certPreviewRow) : null);
         showCertStatus('Pengaturan default sertifikat disimpan.', 'success');
       } catch (err) {
-        alert(String(err));
+        appError(String(err), 'Gagal');
       }
     });
 
@@ -5529,6 +5556,14 @@
     initCertificatesModule();
     initSettingsModal();
     initModalsDismiss();
+    (async () => {
+      try {
+        const s = await invoke('get_settings');
+        applyBusinessNameToUi(s?.businessName);
+      } catch (err) {
+        console.warn('Gagal memuat profil usaha awal:', err);
+      }
+    })();
   });
 
 })();

@@ -967,13 +967,19 @@ fn test_certificate_regression_audit_cases() {
         .unwrap();
 
     assert!(
+        (181.90 - issued_y) >= 24.0,
+        "expected >= 24mm signature clearance above signer top, got {} (issued_y={})",
+        181.90 - issued_y,
+        issued_y
+    );
+    assert!(
         sig_y > issued_y,
         "signature top y={} must be strictly below Issued on baseline y={}",
         sig_y,
         issued_y
     );
     assert!(
-        sig_y + sig_h <= 180.40 - 4.0 + 0.05,
+        sig_y + sig_h <= 185.90 - 4.0 + 0.05,
         "signature bottom {} must stay above signer top",
         sig_y + sig_h
     );
@@ -990,7 +996,7 @@ fn test_certificate_regression_audit_cases() {
         let u_tag = &ultra_svg[u_start..u_end];
         let u_y: f64 = u_tag.split("y=\"").nth(1).unwrap().split('"').next().unwrap().parse().unwrap();
         let u_h: f64 = u_tag.split("height=\"").nth(1).unwrap().split('"').next().unwrap().parse().unwrap();
-        assert!(u_y + u_h <= 176.45, "ultra-dense signature overlapped signer: {} + {}", u_y, u_h);
+        assert!(u_y + u_h <= 181.95, "ultra-dense signature overlapped signer: {} + {}", u_y, u_h);
     }
 
     // H4: Manual certificate_no without '/' must NOT corrupt certificate_sequences for 2026
@@ -1306,6 +1312,61 @@ fn test_recipient_name_normalization_and_body_template() {
         .contains("has completed the three-month internship program in the Front Office Department at Anda Bungalows & Restaurant (March 1, 2025 - May 31, 2025)."));
     let custom_svg = certificate::render_certificate_svg(&custom_data);
     assert!(custom_svg.contains("Issued in Mataram, Lombok, on June 1, 2025"));
+
+    // 3. Business name in settings drives SVG header brand & {properti} template variable
+    let mut mixed_settings = HashMap::new();
+    mixed_settings.insert("businessName".to_string(), "Kuta Sunset Resort".to_string());
+    let mixed_prop_data = CertificateRenderData::from_preview_input(
+        &CertificatePreviewInput {
+            certificate_no: Some("005/ABR-FO/XI/2025".to_string()),
+            recipient_name: Some("Siti Aisyah".to_string()),
+            duration_text: Some("three-month".to_string()),
+            program_name: Some("internship program".to_string()),
+            start_date: Some("2025-03-01".to_string()),
+            end_date: Some("2025-05-31".to_string()),
+            issued_date: Some("2025-06-01".to_string()),
+            issued_city: Some("Kuta, Lombok".to_string()),
+            body_template: None,
+            department: Some("Front Office".to_string()),
+            achievement_text: None,
+            signer_name: None,
+            signer_title: None,
+            paper_size: Some("F4".to_string()),
+            status: None,
+        },
+        &dir,
+        &mixed_settings,
+    );
+    let mixed_svg = certificate::render_certificate_svg(&mixed_prop_data);
+    assert!(mixed_svg.contains(">KUTA SUNSET RESORT</text>"));
+    assert!(mixed_svg.contains("at Kuta Sunset Resort, from March 1, 2025 to May 31, 2025."));
+
+    let mut caps_settings = HashMap::new();
+    caps_settings.insert("businessName".to_string(), "PT BALI PARADISE RESORT".to_string());
+    let caps_prop_data = CertificateRenderData::from_preview_input(
+        &CertificatePreviewInput {
+            certificate_no: Some("006/ABR-FO/XI/2025".to_string()),
+            recipient_name: Some("Siti Aisyah".to_string()),
+            duration_text: Some("three-month".to_string()),
+            program_name: Some("internship program".to_string()),
+            start_date: Some("2025-03-01".to_string()),
+            end_date: Some("2025-05-31".to_string()),
+            issued_date: Some("2025-06-01".to_string()),
+            issued_city: Some("Kuta, Lombok".to_string()),
+            body_template: None,
+            department: Some("Front Office".to_string()),
+            achievement_text: None,
+            signer_name: None,
+            signer_title: None,
+            paper_size: Some("F4".to_string()),
+            status: None,
+        },
+        &dir,
+        &caps_settings,
+    );
+    let caps_svg = certificate::render_certificate_svg(&caps_prop_data);
+    assert!(caps_svg.contains(">PT BALI PARADISE RESORT</text>"));
+    assert!(caps_svg.contains("at PT Bali Paradise Resort, from March 1, 2025 to May 31, 2025."));
 
     let _ = fs::remove_dir_all(&dir);
 }
